@@ -274,10 +274,10 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
   };
 
   return (
-    <div
-      id="synax-chat-room"
-      className="relative z-10 w-full h-[100dvh] min-h-0 flex flex-col bg-[#04060c]/80 backdrop-blur-sm text-slate-100 overflow-hidden select-none"
-    >
+  <div
+  id="synax-chat-room"
+  className="relative z-10 box-border w-full h-[100dvh] min-h-0 flex flex-col bg-[#04060c]/95 backdrop-blur-sm text-slate-100 overflow-hidden select-none"
+>
       {/* Top Banner */}
       <TimeBanner timeStatus={timeStatus} />
 
