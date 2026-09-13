@@ -162,7 +162,7 @@ setTimeStatus(meRes.timeStatus);
     setViewState('password');
   };
 
-  const handlePasswordSubmit = async (password: string) => {
+  const handlePasswordSubmit = async (password: string) => {   if (!selectedUserId) return;    const loginRes = await ApiService.login(selectedUserId, password);    // Set the logged-in user's latest profile   setCurrentUser(loginRes.user);    // Set the logged-in user's profile   if (loginRes.user.id === 'person_1') {     setPerson1(loginRes.user);   } else {     setPerson2(loginRes.user);   }    // IMPORTANT: update the OTHER person's complete profile too,   // including their pfpUrl.   if (loginRes.otherUser.id === 'person_1') {     setPerson1((prev) => ({       ...(prev || {}),       ...loginRes.otherUser,     } as UserProfile));   } else {     setPerson2((prev) => ({       ...(prev || {}),       ...loginRes.otherUser,     } as UserProfile));   }    setSettings(loginRes.settings);   setTimeStatus(loginRes.timeStatus);    // Connect WebSocket   socketService.connect(loginRes.token);    // Fetch conversation   const msgs = await ApiService.getMessages();   setMessages(msgs);    SoundEffects.playSent();   setViewState('chat'); };
   if (!selectedUserId) return;
 
   const loginRes = await ApiService.login(selectedUserId, password);
