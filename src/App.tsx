@@ -99,7 +99,7 @@ export default function App() {
         callType: data.callType || 'voice',
         otherUserId: data.fromUserId || data.callerId || (currentUser?.id === 'person_1' ? 'person_2' : 'person_1'),
         otherUserName: other?.name || 'Sanctuary Partner',
-        otherUserPfp: other?.pfpUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+        otherUserPfp: other?.pfpUrl || '',
         offerSdp: data.sdp,
       });
     };
