@@ -144,25 +144,117 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
     }
   };
 
-  // Grant Extra Time
+  // Grant Extra Time to both users
   const handleGrantTime = async (minutes: number) => {
     try {
-      const updated = await ApiService.adminGrantExtraTime(minutes);
-      setTimeStatus(updated);
-      triggerSuccess(`Granted +${minutes} minutes of sanctuary time!`);
+      await ApiService.adminGrantExtraTime(minutes);
+      await fetchAllData();
+      triggerSuccess(`Granted +${minutes} minutes to both users.`);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to grant time');
     }
   };
 
-  // Reset Usage
+  // Reset usage for both users without changing their configured limits
   const handleResetUsage = async () => {
     try {
-      const updated = await ApiService.adminResetTimeUsage();
-      setTimeStatus(updated);
-      triggerSuccess("Sanctuary usage timer reset to 0!");
+      await ApiService.adminResetTimeUsage();
+      await fetchAllData();
+      triggerSuccess('Usage reset to 0 for both users.');
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to reset usage');
+    }
+  };
+
+  // Set an exact time limit for one user
+  const handleSetTimeLimit = async (
+    userId: 'person_1' | 'person_2',
+    minutes: number
+  ) => {
+    const safeMinutes = Math.max(
+      1,
+      Math.floor(Number(minutes))
+    );
+
+    try {
+      await ApiService.adminSetTimeLimit(
+        userId,
+        safeMinutes
+      );
+      await fetchAllData();
+
+      const personName =
+        userId === 'person_1'
+          ? person1?.name || 'Person 1'
+          : person2?.name || 'Person 2';
+
+      triggerSuccess(
+        `${personName} limit set to ${safeMinutes} minutes.`
+      );
+    } catch (err: any) {
+      setErrorMsg(
+        err.message || 'Failed to set time limit'
+      );
+    }
+  };
+
+  // Add or remove time from one user
+  const handleAdjustTime = async (
+    userId: 'person_1' | 'person_2',
+    minutes: number
+  ) => {
+    try {
+      if (minutes >= 0) {
+        await ApiService.adminAddTime(
+          userId,
+          minutes
+        );
+      } else {
+        await ApiService.adminRemoveTime(
+          userId,
+          Math.abs(minutes)
+        );
+      }
+
+      await fetchAllData();
+
+      const personName =
+        userId === 'person_1'
+          ? person1?.name || 'Person 1'
+          : person2?.name || 'Person 2';
+
+      triggerSuccess(
+        `${personName}: ${
+          minutes >= 0 ? '+' : ''
+        }${minutes} minutes.`
+      );
+    } catch (err: any) {
+      setErrorMsg(
+        err.message || 'Failed to adjust time'
+      );
+    }
+  };
+
+  // Reset usage for one user only
+  const handleResetUserUsage = async (
+    userId: 'person_1' | 'person_2'
+  ) => {
+    try {
+      await ApiService.adminResetUserUsage(userId);
+      await fetchAllData();
+
+      const personName =
+        userId === 'person_1'
+          ? person1?.name || 'Person 1'
+          : person2?.name || 'Person 2';
+
+      triggerSuccess(
+        `${personName} usage reset to 0.`
+      );
+    } catch (err: any) {
+      setErrorMsg(
+        err.message || 'Failed to reset user usage'
+      );
     }
   };
 
@@ -352,7 +444,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span>ONLINE & SECURE</span>
                 </p>
-                <p className="text-[11px] text-slate-500 mt-1 font-mono">Port 3000 • WebSocket Active</p>
+                <p className="text-[11px] text-slate-500 mt-1 font-mono">WebSocket Active • Server Authoritative</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md">
@@ -368,7 +460,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
               <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md">
                 <span className="text-[10px] uppercase font-mono text-slate-400">Messages Stored</span>
                 <p className="text-lg font-bold text-white font-mono mt-1">{messages.length}</p>
-                <p className="text-[11px] text-slate-500 mt-1">Persistent local database</p>
+                <p className="text-[11px] text-slate-500 mt-1">Persistent server database</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md">
@@ -787,95 +879,308 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
           </div>
         )}
 
-        {/* TAB 4: TIME CONTROLS (CRITICAL SERVER-AUTHORITATIVE) */}
+        {/* TAB 4: TIME CONTROLS (SERVER-AUTHORITATIVE) */}
         {activeTab === 'time' && settings && (
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="max-w-5xl mx-auto space-y-6">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold font-cinzel text-white">
                 Server-Side Authoritative Time Controls
               </h2>
               <p className="text-xs text-slate-400 mt-1">
-                The server regulates usage timestamps and automatically disables messaging and calling when time expires.
+                Set an exact limit, add or remove time, or reset consumed usage.
+                The server remains the source of truth for both users.
               </p>
             </div>
 
-            <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-6">
-              {/* Mode & Duration */}
+            {/* Tracking mode and expiration settings */}
+            <div className="p-4 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs uppercase text-slate-400 font-medium">Tracking Mode</label>
+                  <label className="text-xs uppercase text-slate-400 font-medium">
+                    Tracking Mode
+                  </label>
                   <select
                     value={settings.timeStrategy}
                     onChange={(e) =>
-  setSettings({
-    ...settings,
-    timeStrategy: e.target.value as 'continuous' | 'daily',
-  })
-}
+                      setSettings({
+                        ...settings,
+                        timeStrategy:
+                          e.target.value as 'continuous' | 'daily',
+                      })
+                    }
                     className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white"
                   >
-                    <option value="daily">Daily Allowed Time (Aggregated)</option>
-                    <option value="continuous">Continuous Session (Resets on logout)</option>
+                    <option value="daily">
+                      Daily Allowed Time (Aggregated)
+                    </option>
+                    <option value="continuous">
+                      Active Usage (Pauses When Offline)
+                    </option>
                   </select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs uppercase text-slate-400 font-medium">Allowed Minutes</label>
+                  <label className="text-xs uppercase text-slate-400 font-medium">
+                    Expiration Message
+                  </label>
                   <input
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={users[0]?.allowedMinutes ?? 60}
-                    onChange={(e) => {
-  const minutes = parseInt(e.target.value, 10) || 60;
-  setUsers((current) =>
-    current.map((user) =>
-      user.id === 'person_1'
-        ? { ...user, allowedMinutes: minutes }
-        : user
-    )
-  );
-}}
-                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white font-mono"
+                    type="text"
+                    value={settings.timeOverMessage}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        timeOverMessage: e.target.value,
+                      })
+                    }
+                    placeholder="Your time in SYNAX has ended for now."
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white"
                   />
                 </div>
               </div>
 
-              {/* Custom Time-Over Message */}
-              <div className="space-y-1.5">
-                <label className="text-xs uppercase text-slate-400 font-medium">
-                  Custom Expiration Message
-                </label>
-                <input
-                  type="text"
-                  value={settings.timeOverMessage}
-                 onChange={(e) =>
-  setSettings({
-    ...settings,
-    timeOverMessage: e.target.value,
-  })
-}
-                  placeholder="e.g. Your time in SYNAX has ended for now. See you again soon ✨"
-                  className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white"
-                />
+              {/* Per-user time controls */}
+              <div className="pt-5 border-t border-slate-800 space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">
+                    Individual User Time
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Set the total limit directly. Removing time can never reduce
+                    the finite limit below 1 minute.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {[person1, person2]
+                    .filter(
+                      (user): user is UserProfile =>
+                        Boolean(user)
+                    )
+                    .map((user) => {
+                      const isPerson1 =
+                        user.id === 'person_1';
+
+                      const time = (user as any).timeStatus;
+                      const remainingSeconds =
+                        time?.remainingSeconds ?? 0;
+
+                      return (
+                        <div
+                          key={user.id}
+                          className={`p-4 sm:p-5 rounded-2xl bg-slate-950/80 border ${
+                            isPerson1
+                              ? 'border-indigo-500/30'
+                              : 'border-pink-500/30'
+                          } space-y-4`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex items-center gap-3">
+                              <LogoMark
+                                logo={user.logo}
+                                size="sm"
+                                glow={false}
+                              />
+                              <div className="min-w-0">
+                                <h4 className="text-sm font-bold text-white font-cinzel truncate">
+                                  {user.name}
+                                </h4>
+                                <p className="text-[10px] text-slate-500 font-mono">
+                                  {user.id}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <p
+                                className={`text-lg font-bold font-mono ${
+                                  time?.isExpired
+                                    ? 'text-red-400'
+                                    : isPerson1
+                                      ? 'text-indigo-300'
+                                      : 'text-pink-300'
+                                }`}
+                              >
+                                {Math.floor(
+                                  remainingSeconds / 60
+                                )}m {remainingSeconds % 60}s
+                              </p>
+                              <p className="text-[10px] text-slate-500">
+                                remaining
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase text-slate-500">
+                                Exact Limit (minutes)
+                              </label>
+                              <input
+                                id={`time-limit-${user.id}`}
+                                type="number"
+                                min={1}
+                                max={10080}
+                                defaultValue={user.allowedMinutes}
+                                key={`${user.id}-${user.allowedMinutes}`}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const value = Number(
+                                      (
+                                        e.target as HTMLInputElement
+                                      ).value
+                                    );
+                                    if (
+                                      Number.isFinite(value) &&
+                                      value >= 1
+                                    ) {
+                                      void handleSetTimeLimit(
+                                        user.id,
+                                        value
+                                      );
+                                    }
+                                  }
+                                }}
+                                className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-mono"
+                              />
+                            </div>
+
+                            <div className="flex items-end">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const element =
+                                    document.getElementById(
+                                      `time-limit-${user.id}`
+                                    ) as HTMLInputElement | null;
+
+                                  const value = Number(
+                                    element?.value ??
+                                      user.allowedMinutes
+                                  );
+
+                                  if (
+                                    Number.isFinite(value) &&
+                                    value >= 1
+                                  ) {
+                                    void handleSetTimeLimit(
+                                      user.id,
+                                      value
+                                    );
+                                  }
+                                }}
+                                className={`w-full px-3 py-2.5 rounded-xl text-white text-xs font-semibold ${
+                                  isPerson1
+                                    ? 'bg-indigo-600 hover:bg-indigo-500'
+                                    : 'bg-pink-600 hover:bg-pink-500'
+                                }`}
+                              >
+                                Set Exact Limit
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleAdjustTime(
+                                  user.id,
+                                  5
+                                )
+                              }
+                              className="px-2 py-2 rounded-xl bg-indigo-950/70 hover:bg-indigo-900 text-indigo-300 border border-indigo-800/60 text-[11px] font-semibold"
+                            >
+                              +5m
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleAdjustTime(
+                                  user.id,
+                                  15
+                                )
+                              }
+                              className="px-2 py-2 rounded-xl bg-indigo-950/70 hover:bg-indigo-900 text-indigo-300 border border-indigo-800/60 text-[11px] font-semibold"
+                            >
+                              +15m
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleAdjustTime(
+                                  user.id,
+                                  -5
+                                )
+                              }
+                              className="px-2 py-2 rounded-xl bg-red-950/50 hover:bg-red-900/60 text-red-300 border border-red-800/60 text-[11px] font-semibold"
+                            >
+                              -5m
+                            </button>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleResetUserUsage(
+                                  user.id
+                                )
+                              }
+                              className="flex-1 px-3 py-2.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/70 text-amber-300 border border-amber-800/60 text-xs font-semibold flex items-center justify-center gap-2"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              Reset Usage
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const confirmed =
+                                  window.confirm(
+                                    `Set ${user.name}'s limit to 1 minute? This may immediately expire their current session.`
+                                  );
+
+                                if (confirmed) {
+                                  void handleSetTimeLimit(
+                                    user.id,
+                                    1
+                                  );
+                                }
+                              }}
+                              className="px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 text-xs font-semibold"
+                            >
+                              Minimum
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
 
-              {/* Expiration Restrictions checkboxes */}
-              <div className="pt-4 border-t border-slate-800">
+              {/* Global expiration restrictions */}
+              <div className="pt-5 border-t border-slate-800">
                 <h4 className="text-xs uppercase tracking-wider text-slate-300 font-semibold mb-3">
                   Restrictions When Time Expires
                 </h4>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={settings.restrictionsOnExpire.disableMessages}
+                      checked={
+                        settings.restrictionsOnExpire
+                          .disableMessaging
+                      }
                       onChange={(e) =>
                         setSettings({
                           ...settings,
                           restrictionsOnExpire: {
                             ...settings.restrictionsOnExpire,
-                            disableMessages: e.target.checked,
+                            disableMessaging:
+                              e.target.checked,
                           },
                         })
                       }
@@ -887,13 +1192,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
                   <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={settings.restrictionsOnExpire.disableVoiceCalls}
+                      checked={
+                        settings.restrictionsOnExpire
+                          .disableVoiceCalls
+                      }
                       onChange={(e) =>
                         setSettings({
                           ...settings,
                           restrictionsOnExpire: {
                             ...settings.restrictionsOnExpire,
-                            disableVoiceCalls: e.target.checked,
+                            disableVoiceCalls:
+                              e.target.checked,
                           },
                         })
                       }
@@ -905,13 +1214,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
                   <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={settings.restrictionsOnExpire.disableVideoCalls}
+                      checked={
+                        settings.restrictionsOnExpire
+                          .disableVideoCalls
+                      }
                       onChange={(e) =>
                         setSettings({
                           ...settings,
                           restrictionsOnExpire: {
                             ...settings.restrictionsOnExpire,
-                            disableVideoCalls: e.target.checked,
+                            disableVideoCalls:
+                              e.target.checked,
                           },
                         })
                       }
@@ -923,19 +1236,91 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
                   <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={settings.restrictionsOnExpire.disableMediaUpload}
+                      checked={
+                        settings.restrictionsOnExpire
+                          .disableImages
+                      }
                       onChange={(e) =>
                         setSettings({
                           ...settings,
                           restrictionsOnExpire: {
                             ...settings.restrictionsOnExpire,
-                            disableMediaUpload: e.target.checked,
+                            disableImages:
+                              e.target.checked,
                           },
                         })
                       }
                       className="rounded bg-slate-950 text-indigo-600"
                     />
-                    <span>Disable file & photo uploads</span>
+                    <span>Disable image uploads</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={
+                        settings.restrictionsOnExpire
+                          .disableFiles
+                      }
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          restrictionsOnExpire: {
+                            ...settings.restrictionsOnExpire,
+                            disableFiles:
+                              e.target.checked,
+                          },
+                        })
+                      }
+                      className="rounded bg-slate-950 text-indigo-600"
+                    />
+                    <span>Disable file uploads</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={
+                        settings.restrictionsOnExpire
+                          .disableVoiceMessages
+                      }
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          restrictionsOnExpire: {
+                            ...settings.restrictionsOnExpire,
+                            disableVoiceMessages:
+                              e.target.checked,
+                          },
+                        })
+                      }
+                      className="rounded bg-slate-950 text-indigo-600"
+                    />
+                    <span>Disable voice messages</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={
+                        settings.restrictionsOnExpire
+                          .lockSession
+                      }
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          restrictionsOnExpire: {
+                            ...settings.restrictionsOnExpire,
+                            lockSession:
+                              e.target.checked,
+                          },
+                        })
+                      }
+                      className="rounded bg-slate-950 text-indigo-600"
+                    />
+                    <span>
+                      Lock session when time reaches zero
+                    </span>
                   </label>
                 </div>
               </div>
