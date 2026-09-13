@@ -143,7 +143,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       {/* Sender Avatar */}
       <div className="shrink-0 pt-1">
         <img
-          src={senderPfp || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+          src={senderPfp}
           alt={senderName}
           className="w-8 h-8 rounded-full object-cover border border-slate-700/60 shadow-sm"
         />
