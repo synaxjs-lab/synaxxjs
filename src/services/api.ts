@@ -377,7 +377,13 @@ export const ApiService = {
       },
       body: JSON.stringify(payload),
     });
-    const resData = await res.json();
+    const resData = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(
+        resData.error || resData.message || 'Failed to update user'
+      );
+    }
 
     // If locked status changed
     if (data.isLocked !== undefined) {
@@ -394,37 +400,73 @@ export const ApiService = {
     return resData;
   },
 
-  async adminGrantExtraTime(minutes: number): Promise<TimeStatus> {
+  async adminAdjustUserTime(
+    userId: 'person_1' | 'person_2',
+    options: { setMinutes?: number; addMinutes?: number; resetSession?: boolean }
+  ): Promise<TimeStatus> {
     const token = ApiService.getAdminToken();
-    // Grant to both person_1 and person_2
-    await fetch('/api/admin/user/person_1/reset-time', {
+    const res = await fetch(`/api/admin/user/${userId}/reset-time`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ addMinutes: minutes }),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(options),
     });
-    const res = await fetch('/api/admin/user/person_2/reset-time', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ addMinutes: minutes }),
-    });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(
+        data.error || data.message || 'Failed to adjust user time'
+      );
+    }
     return data.timeStatus;
   },
 
+  async adminSetTimeLimit(
+    userId: 'person_1' | 'person_2',
+    minutes: number
+  ): Promise<TimeStatus> {
+    return ApiService.adminAdjustUserTime(userId, {
+      setMinutes: minutes,
+    });
+  },
+
+  async adminAddTime(
+    userId: 'person_1' | 'person_2',
+    minutes: number
+  ): Promise<TimeStatus> {
+    return ApiService.adminAdjustUserTime(userId, {
+      addMinutes: minutes,
+    });
+  },
+
+  async adminRemoveTime(
+    userId: 'person_1' | 'person_2',
+    minutes: number
+  ): Promise<TimeStatus> {
+    return ApiService.adminAdjustUserTime(userId, {
+      addMinutes: -Math.abs(minutes),
+    });
+  },
+
+  async adminResetUserUsage(
+    userId: 'person_1' | 'person_2'
+  ): Promise<TimeStatus> {
+    return ApiService.adminAdjustUserTime(userId, {
+      resetSession: true,
+    });
+  },
+
+  async adminGrantExtraTime(minutes: number): Promise<TimeStatus> {
+    const first = await ApiService.adminAddTime('person_1', minutes);
+    const second = await ApiService.adminAddTime('person_2', minutes);
+    return second || first;
+  },
+
   async adminResetTimeUsage(): Promise<TimeStatus> {
-    const token = ApiService.getAdminToken();
-    await fetch('/api/admin/user/person_1/reset-time', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ resetSession: true }),
-    });
-    const res = await fetch('/api/admin/user/person_2/reset-time', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ resetSession: true }),
-    });
-    const data = await res.json();
-    return data.timeStatus;
+    const first = await ApiService.adminResetUserUsage('person_1');
+    const second = await ApiService.adminResetUserUsage('person_2');
+    return second || first;
   },
 
   async adminClearMessages() {
