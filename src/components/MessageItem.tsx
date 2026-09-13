@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ChatMessage } from '../types';
 import {
@@ -15,7 +15,6 @@ import {
   Copy,
   Check,
   CheckCheck,
-  Clock,
   PinOff
 } from 'lucide-react';
 
@@ -59,6 +58,28 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [copied, setCopied] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Close the mobile action menu when tapping anywhere outside this message.
+  useEffect(() => {
+    if (!showActionsMenu) return;
+
+    const handleOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      const messageElement = document.getElementById(`msg-${message.id}`);
+
+      if (messageElement && target && !messageElement.contains(target)) {
+        setShowActionsMenu(false);
+        setShowReactionPicker(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointer);
+
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointer);
+    };
+  }, [showActionsMenu, message.id]);
+
 
   // System Message
   if (isSystem) {
@@ -138,7 +159,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   return (
     <div
       id={`msg-${message.id}`}
-      className={`group relative flex gap-3 my-2.5 px-2 md:px-4 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
+      className={`group relative flex gap-3 my-2.5 px-2 md:px-4 cursor-default ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
+      onClick={() => {
+        if (window.matchMedia('(max-width: 767px)').matches) {
+          setShowActionsMenu((prev) => !prev);
+          setShowReactionPicker(false);
+        }
+      }}
     >
       {/* Sender Avatar */}
       <div className="shrink-0 pt-1">
@@ -197,6 +224,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               <textarea
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
                 className="w-full p-2 text-xs bg-slate-950/80 rounded-xl border border-slate-700 text-white focus:outline-none"
                 rows={2}
                 autoFocus
@@ -334,18 +362,44 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           </div>
         )}
 
-        {/* Hover Actions Toolbar */}
+        {/* Message Actions */}
         {!message.deleted && (
-          <div
-            className={`absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 p-1 rounded-xl bg-slate-900/90 border border-slate-700/80 shadow-lg backdrop-blur-md z-20 ${
-              isMe ? 'right-full mr-2' : 'left-full ml-2'
-            }`}
-          >
+          <>
+            {/* Mobile action trigger */}
+            <button
+              type="button"
+              aria-label="Message actions"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowActionsMenu((prev) => !prev);
+                setShowReactionPicker(false);
+              }}
+              className={`md:hidden absolute top-1 ${
+                isMe ? 'left-full ml-1.5' : 'right-full mr-1.5'
+              } w-8 h-8 rounded-full bg-slate-900/95 border border-slate-700 text-slate-300 flex items-center justify-center shadow-lg z-30`}
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {/* Desktop hover toolbar + mobile tap toolbar */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className={`absolute top-0 ${
+                isMe ? 'right-full mr-2' : 'left-full ml-2'
+              } ${
+                showActionsMenu
+                  ? 'flex opacity-100'
+                  : 'hidden md:flex md:opacity-0 md:group-hover:opacity-100'
+              } items-center gap-1 p-1 rounded-xl bg-slate-900/95 border border-slate-700/80 shadow-lg backdrop-blur-md z-20`}
+            >
             {/* Quick Reaction Button */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setShowReactionPicker(!showReactionPicker)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReactionPicker((prev) => !prev);
+                }}
                 className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
                 title="Add reaction"
               >
@@ -359,9 +413,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                     <button
                       key={emoji}
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         onReact(message.id, emoji);
                         setShowReactionPicker(false);
+                        setShowActionsMenu(false);
                       }}
                       className="p-1 hover:scale-125 transition-transform text-sm"
                     >
@@ -375,7 +431,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             {/* Reply */}
             <button
               type="button"
-              onClick={() => onReply(message)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onReply(message);
+                setShowActionsMenu(false);
+              }}
               className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
               title="Reply"
             >
@@ -385,7 +445,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             {/* Pin */}
             <button
               type="button"
-              onClick={() => onPin(message.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPin(message.id);
+                setShowActionsMenu(false);
+              }}
               className="p-1 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-slate-800"
               title={message.isPinned ? 'Unpin' : 'Pin'}
             >
@@ -396,7 +460,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             {message.text && (
               <button
                 type="button"
-                onClick={handleCopy}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopy();
+                  setShowActionsMenu(false);
+                }}
                 className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
                 title="Copy text"
               >
@@ -408,7 +476,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             {isMe && message.type === 'text' && (
               <button
                 type="button"
-                onClick={() => setIsEditing(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsEditing(true);
+                  setShowActionsMenu(false);
+                }}
                 className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
                 title="Edit message"
               >
@@ -420,14 +492,19 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             {isMe && (
               <button
                 type="button"
-                onClick={() => onDelete(message.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(message.id);
+                  setShowActionsMenu(false);
+                }}
                 className="p-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800"
                 title="Delete for everyone"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
-          </div>
+            </div>
+          </>
         )}
       </div>
     </div>
