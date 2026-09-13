@@ -73,10 +73,12 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
     const container = messagesContainerRef.current;
     if (!container) return;
 
-    const handleScroll = () => {
-      // This collapsing chrome is intentionally mobile-only.
+    let ticking = false;
+
+    const updateHeader = () => {
+      ticking = false;
       if (window.innerWidth >= 768) {
-        setShowMobileHeader(true);
+        if (!showMobileHeader) setShowMobileHeader(true);
         return;
       }
 
@@ -84,25 +86,26 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
       const lastTop = lastScrollTopRef.current;
       const delta = currentTop - lastTop;
 
-      if (currentTop <= 12) {
+      if (currentTop <= 8) {
         setShowMobileHeader(true);
-      } else if (delta > 8) {
-        // Scrolling down: hide the upper chrome so the conversation gets more room.
+      } else if (delta >= 6) {
         setShowMobileHeader(false);
-      } else if (delta < -8) {
-        // Scrolling up: reveal the upper chrome with animation.
+      } else if (delta <= -6) {
         setShowMobileHeader(true);
       }
 
       lastScrollTopRef.current = currentTop;
     };
 
-    container.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
+    const handleScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(updateHeader);
     };
-  }, []);
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [showMobileHeader]);
 
   // Real-time WebSocket Listeners
   useEffect(() => {
@@ -277,153 +280,143 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
       className="relative z-10 w-full h-[100dvh] min-h-0 flex flex-col bg-[#04060c]/80 backdrop-blur-sm text-slate-100 overflow-hidden select-none"
     >
       {/* =====================================================
-          MOBILE COLLAPSING CHROME
-          - Hidden while scrolling down / messaging
-          - Revealed when scrolling up
-          - Timer and controls get their own space so nothing overlaps
+          MOBILE COMPACT CHROME
+          - No large TimeBanner on mobile
+          - One compact row only
+          - Slides away while reading / messaging
+          - Returns smoothly when scrolling upward
       ====================================================== */}
-      <motion.div
-        className="md:hidden shrink-0 overflow-hidden relative z-40 bg-slate-950/98 border-b border-slate-800/80 backdrop-blur-xl"
-        initial={false}
-        animate={{
-          height: showMobileHeader ? 'auto' : 0,
-          opacity: showMobileHeader ? 1 : 0,
-          y: showMobileHeader ? 0 : -10,
-        }}
-        transition={{
-          duration: 0.22,
-          ease: 'easeOut',
-        }}
-      >
-        <div className="w-full bg-slate-950/98">
-          <TimeBanner timeStatus={timeStatus} />
-
-          {/* Mobile identity + timer row */}
-          <div className="px-2 py-2 flex items-center gap-2 min-w-0">
-            <div className="relative shrink-0 w-10 h-10 rounded-full overflow-hidden border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-              <img
-                src={
-                  otherUser.pfpUrl ||
-                  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200'
-                }
-                alt={otherUser.name}
-                className="block w-full h-full object-cover object-center"
-              />
-              <span
-                className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-slate-950 ${
-                  otherPresence.isOnline
-                    ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
-                    : 'bg-slate-500'
-                }`}
-              />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <h2 className="min-w-0 max-w-[130px] truncate text-sm font-bold text-white font-cinzel tracking-anime-header text-shadow-anime-glow">
-                  {otherUser.nickname || otherUser.name}
-                </h2>
-                <div className="shrink-0 flex items-center">
-                  <LogoMark
-                    logo={otherUser.logo}
-                    size="sm"
-                    glow={false}
-                    className="opacity-80"
-                  />
-                </div>
+      <AnimatePresence initial={false}>
+        {showMobileHeader && (
+          <motion.div
+            key="mobile-chat-header"
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.14, ease: 'easeOut' }}
+            className="md:hidden shrink-0 relative z-40 bg-slate-950 border-b border-slate-800/80"
+          >
+            <div className="w-full min-w-0 h-[62px] px-2 flex items-center gap-1.5">
+              {/* PFP */}
+              <div className="relative shrink-0 w-9 h-9 rounded-full overflow-hidden border-2 border-indigo-500/50 shadow-[0_0_12px_rgba(99,102,241,0.2)]">
+                <img
+                  src={
+                    otherUser.pfpUrl ||
+                    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200'
+                  }
+                  alt={otherUser.name}
+                  className="block w-full h-full object-cover object-center"
+                />
+                <span
+                  className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-slate-950 ${
+                    otherPresence.isOnline
+                      ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
+                      : 'bg-slate-500'
+                  }`}
+                />
               </div>
 
-              <p className="text-[10px] font-sans-celestial tracking-wide truncate">
-                {isOtherTyping ? (
-                  <span className="text-indigo-400 animate-pulse font-medium">
-                    typing...
-                  </span>
-                ) : otherPresence.isOnline ? (
-                  <span className="text-emerald-400">Online</span>
-                ) : (
-                  <span className="text-slate-400">
-                    {formatLastSeen(otherPresence.lastSeen)}
-                  </span>
-                )}
-              </p>
-            </div>
+              {/* Name + logo */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center min-w-0 gap-1">
+                  <h2 className="min-w-0 max-w-[92px] truncate text-xs font-bold text-white font-cinzel tracking-anime-header text-shadow-anime-glow">
+                    {otherUser.nickname || otherUser.name}
+                  </h2>
+                  <div className="shrink-0 flex items-center justify-center">
+                    <LogoMark
+                      logo={otherUser.logo}
+                      size="sm"
+                      glow={false}
+                      className="opacity-75 scale-90"
+                    />
+                  </div>
+                </div>
+                <p className="text-[9px] text-slate-400 truncate tracking-wide">
+                  {isOtherTyping ? (
+                    <span className="text-indigo-400 animate-pulse">typing...</span>
+                  ) : otherPresence.isOnline ? (
+                    <span className="text-emerald-400">Online</span>
+                  ) : (
+                    formatLastSeen(otherPresence.lastSeen)
+                  )}
+                </p>
+              </div>
 
-            {/* Timer gets a dedicated, always-on-top slot on mobile */}
-            {timeStatus && (
-              <div className="shrink-0 relative z-50 flex items-center">
-                <div className="scale-[0.92] origin-right">
+              {/* Timer: dedicated non-overlapping space */}
+              {timeStatus && (
+                <div className="shrink-0 flex items-center justify-center min-w-[70px]">
                   <TimeRemainingPill
                     secondsLeft={timeStatus.remainingSeconds}
                     isExpired={timeStatus.isExpired}
                   />
                 </div>
+              )}
+
+              {/* Compact controls */}
+              <div className="shrink-0 flex items-center gap-1">
+                {settings.featuresEnabled.voiceCalls && (
+                  <button
+                    id="start-voice-call-btn-mobile"
+                    type="button"
+                    onClick={() => onStartCall('voice')}
+                    disabled={!!(timeStatus?.isExpired && settings.restrictionsOnExpire.disableVoiceCalls)}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center bg-slate-900 border border-slate-700/80 text-indigo-300 disabled:opacity-40"
+                    title="Voice call"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                {settings.featuresEnabled.videoCalls && (
+                  <button
+                    id="start-video-call-btn-mobile"
+                    type="button"
+                    onClick={() => onStartCall('video')}
+                    disabled={!!(timeStatus?.isExpired && settings.restrictionsOnExpire.disableVideoCalls)}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center bg-slate-900 border border-slate-700/80 text-pink-300 disabled:opacity-40"
+                    title="Video call"
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setIsSearching((prev) => !prev)}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center border ${
+                    isSearching
+                      ? 'bg-indigo-600 border-indigo-500 text-white'
+                      : 'bg-slate-900 border-slate-800 text-slate-400'
+                  }`}
+                  title="Search"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  id="open-profile-settings-btn-mobile"
+                  type="button"
+                  onClick={onOpenProfile}
+                  className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 flex items-center justify-center"
+                  title="Profile settings"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  id="user-logout-btn-mobile"
+                  type="button"
+                  onClick={onLogout}
+                  className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 flex items-center justify-center"
+                  title="Logout"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
               </div>
-            )}
-          </div>
-
-          {/* Mobile action row */}
-          <div className="px-2 pb-2 flex items-center justify-end gap-1.5 overflow-x-auto">
-            {settings.featuresEnabled.voiceCalls && (
-              <button
-                id="start-voice-call-btn-mobile"
-                type="button"
-                onClick={() => onStartCall('voice')}
-                disabled={!!(timeStatus?.isExpired && settings.restrictionsOnExpire.disableVoiceCalls)}
-                className="w-9 h-9 rounded-xl shrink-0 flex items-center justify-center bg-slate-900 border border-slate-700/80 text-indigo-300 disabled:opacity-40"
-                title="Start encrypted voice call"
-              >
-                <Phone className="w-4 h-4" />
-              </button>
-            )}
-
-            {settings.featuresEnabled.videoCalls && (
-              <button
-                id="start-video-call-btn-mobile"
-                type="button"
-                onClick={() => onStartCall('video')}
-                disabled={!!(timeStatus?.isExpired && settings.restrictionsOnExpire.disableVideoCalls)}
-                className="w-9 h-9 rounded-xl shrink-0 flex items-center justify-center bg-slate-900 border border-slate-700/80 text-pink-300 disabled:opacity-40"
-                title="Start private video call"
-              >
-                <Video className="w-4 h-4" />
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setIsSearching(!isSearching)}
-              className={`w-9 h-9 rounded-xl shrink-0 border flex items-center justify-center ${
-                isSearching
-                  ? 'bg-indigo-600 border-indigo-500 text-white'
-                  : 'bg-slate-900 border-slate-800 text-slate-400'
-              }`}
-              title="Search conversation"
-            >
-              <Search className="w-4 h-4" />
-            </button>
-
-            <button
-              id="open-profile-settings-btn-mobile"
-              type="button"
-              onClick={onOpenProfile}
-              className="w-9 h-9 rounded-xl shrink-0 bg-slate-900 border border-slate-800 text-slate-400 flex items-center justify-center"
-              title="Change your PFP & Profile"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-
-            <button
-              id="user-logout-btn-mobile"
-              type="button"
-              onClick={onLogout}
-              className="w-9 h-9 rounded-xl shrink-0 bg-slate-900 border border-slate-800 text-slate-400 flex items-center justify-center"
-              title="Lock & Exit Sanctuary"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* =====================================================
           DESKTOP CHROME - unchanged layout
@@ -435,7 +428,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative shrink-0">
               <img
-                src={otherUser.pfpUrl}
+                src={otherUser.pfpUrl || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200'}
                 alt={otherUser.name}
                 className="w-10 h-10 rounded-full object-cover border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
               />
@@ -664,15 +657,22 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
       </div>
 
       {/* Message Composer at Bottom */}
-      <MessageComposer
-        onSendMessage={handleSendMessage}
-        onTyping={handleTyping}
-        onUpload={handleUpload}
-        isExpired={timeStatus?.isExpired}
-        settings={settings}
-        replyingTo={replyingTo}
-        onCancelReply={() => setReplyingTo(null)}
-      />
+      <div
+        className="fixed md:static left-0 right-0 bottom-0 z-50 md:z-auto w-full md:shrink-0"
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
+      >
+        <MessageComposer
+          onSendMessage={handleSendMessage}
+          onTyping={handleTyping}
+          onUpload={handleUpload}
+          isExpired={timeStatus?.isExpired}
+          settings={settings}
+          replyingTo={replyingTo}
+          onCancelReply={() => setReplyingTo(null)}
+        />
+      </div>
 
       {/* Image Lightbox Modal */}
       <AnimatePresence>
