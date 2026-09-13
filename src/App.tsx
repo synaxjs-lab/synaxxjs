@@ -9,16 +9,29 @@ import { AdminPanel } from './components/AdminPanel';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { CallModal, ActiveCallState } from './components/CallModal';
-import { UserProfile, AppSettings, TimeStatus, ChatMessage } from './types';
+import {
+  UserProfile,
+  AppSettings,
+  TimeStatus,
+  ChatMessage
+} from './types';
 import { ApiService } from './services/api';
 import { socketService } from './services/socket';
 import { SoundEffects } from './services/sound';
 import { Loader2 } from 'lucide-react';
 
 export default function App() {
-  const [viewState, setViewState] = useState<'loading' | 'intro' | 'select' | 'password' | 'chat' | 'admin'>('loading');
-  const [selectedUserId, setSelectedUserId] = useState<'person_1' | 'person_2' | null>(null);
-  const [activeSide, setActiveSide] = useState<'left' | 'right' | 'both' | null>('both');
+  const [viewState, setViewState] = useState<
+    'loading' | 'intro' | 'select' | 'password' | 'chat' | 'admin'
+  >('loading');
+
+  const [selectedUserId, setSelectedUserId] = useState<
+    'person_1' | 'person_2' | null
+  >(null);
+
+  const [activeSide, setActiveSide] = useState<
+    'left' | 'right' | 'both' | null
+  >('both');
 
   // Entities
   const [person1, setPerson1] = useState<UserProfile | null>(null);
@@ -38,27 +51,45 @@ export default function App() {
     const initApp = async () => {
       try {
         const config = await ApiService.getConfig();
+
         setPerson1(config.person1);
         setPerson2(config.person2);
         setSettings(config.settings);
         setTimeStatus(config.timeStatus);
 
-        // Check if existing valid user session
+        // Check if an existing valid user session exists
         const storedToken = localStorage.getItem('synax_user_token');
+
         if (storedToken) {
           try {
-           const meRes = await ApiService.getMe();
+            const meRes = await ApiService.getMe();
 
-setCurrentUser(meRes.user);
+            // Set current user
+            setCurrentUser(meRes.user);
 
-if (meRes.user.id === 'person_1') {
-  setPerson1(meRes.user);
-} else {
-  setPerson2(meRes.user);
-}
+            // IMPORTANT:
+            // Keep both users synchronized with the latest server profile data,
+            // including pfpUrl.
+            if (meRes.user.id === 'person_1') {
+              setPerson1(meRes.user);
+            } else {
+              setPerson2(meRes.user);
+            }
 
-setSettings(meRes.settings);
-setTimeStatus(meRes.timeStatus);
+            if (meRes.otherUser.id === 'person_1') {
+              setPerson1((prev) => ({
+                ...(prev || {}),
+                ...meRes.otherUser,
+              } as UserProfile));
+            } else {
+              setPerson2((prev) => ({
+                ...(prev || {}),
+                ...meRes.otherUser,
+              } as UserProfile));
+            }
+
+            setSettings(meRes.settings);
+            setTimeStatus(meRes.timeStatus);
 
             // Connect socket
             socketService.connect(storedToken);
@@ -70,13 +101,14 @@ setTimeStatus(meRes.timeStatus);
             setViewState('chat');
             return;
           } catch (e) {
-            // Token expired or invalid
+            console.error('Existing session is invalid:', e);
             localStorage.removeItem('synax_user_token');
           }
         }
 
         // Check if intro has been seen this session
         const introSeen = sessionStorage.getItem('synax_intro_seen');
+
         if (introSeen === 'true') {
           setViewState('select');
         } else {
@@ -91,7 +123,7 @@ setTimeStatus(meRes.timeStatus);
     initApp();
   }, []);
 
-  // Global WebSocket event listeners (Time ticks, incoming calls, locks)
+  // Global WebSocket event listeners
   useEffect(() => {
     const unsubTime = socketService.on('time:tick', (data) => {
       if (data.timeStatus) {
@@ -99,48 +131,126 @@ setTimeStatus(meRes.timeStatus);
       }
     });
 
+    // IMPORTANT:
+    // When either user changes their PFP/profile,
+    // update that user everywhere on both sides.
+    const unsubProfileUpdate = socketService.on(
+      'profile:updated',
+      (data: any) => {
+        if (!data?.userId || !data?.profile) return;
+
+        const updatedProfile = data.profile;
+
+        if (data.userId === 'person_1') {
+          setPerson1((prev) => ({
+            ...(prev || {}),
+            ...updatedProfile,
+          } as UserProfile));
+
+          setCurrentUser((prev) => {
+            if (!prev || prev.id !== 'person_1') return prev;
+
+            return {
+              ...prev,
+              ...updatedProfile,
+            } as UserProfile;
+          });
+        }
+
+        if (data.userId === 'person_2') {
+          setPerson2((prev) => ({
+            ...(prev || {}),
+            ...updatedProfile,
+          } as UserProfile));
+
+          setCurrentUser((prev) => {
+            if (!prev || prev.id !== 'person_2') return prev;
+
+            return {
+              ...prev,
+              ...updatedProfile,
+            } as UserProfile;
+          });
+        }
+      }
+    );
+
     const handleIncomingCall = (data: any) => {
-      const other = currentUser?.id === 'person_1' ? person2 : person1;
+      const other =
+        currentUser?.id === 'person_1' ? person2 : person1;
+
       setActiveCall({
         role: 'callee',
         status: 'ringing',
         callType: data.callType || 'voice',
-        otherUserId: data.fromUserId || data.callerId || (currentUser?.id === 'person_1' ? 'person_2' : 'person_1'),
+        otherUserId:
+          data.fromUserId ||
+          data.callerId ||
+          (currentUser?.id === 'person_1'
+            ? 'person_2'
+            : 'person_1'),
         otherUserName: other?.name || 'Sanctuary Partner',
         otherUserPfp: other?.pfpUrl || '',
         offerSdp: data.sdp,
       });
     };
 
-    const unsubIncomingCall = socketService.on('call:incoming', handleIncomingCall);
-    const unsubOfferCall = socketService.on('call:offer', handleIncomingCall);
+    const unsubIncomingCall = socketService.on(
+      'call:incoming',
+      handleIncomingCall
+    );
+
+    const unsubOfferCall = socketService.on(
+      'call:offer',
+      handleIncomingCall
+    );
 
     const unsubCallEnd = socketService.on('call:end', () => {
-      setActiveCall((prev) => (prev ? { ...prev, status: 'ended' } : null));
-      setTimeout(() => setActiveCall(null), 1200);
+      setActiveCall((prev) =>
+        prev ? { ...prev, status: 'ended' } : null
+      );
+
+      setTimeout(() => {
+        setActiveCall(null);
+      }, 1200);
     });
 
     const unsubCallReject = socketService.on('call:reject', () => {
-      setActiveCall((prev) => (prev ? { ...prev, status: 'ended' } : null));
-      setTimeout(() => setActiveCall(null), 1200);
+      setActiveCall((prev) =>
+        prev ? { ...prev, status: 'ended' } : null
+      );
+
+      setTimeout(() => {
+        setActiveCall(null);
+      }, 1200);
     });
 
-    const unsubSettings = socketService.on('settings:updated', (data) => {
-      if (data.settings) {
-        setSettings(data.settings);
+    const unsubSettings = socketService.on(
+      'settings:updated',
+      (data) => {
+        if (data.settings) {
+          setSettings(data.settings);
+        }
       }
-    });
+    );
 
-    const unsubLockout = socketService.on('session:lockout', (data) => {
-      // User was locked out or emergency lockdown initiated
-      if (viewState === 'chat') {
-        alert(data.reason || 'Sanctuary session terminated by Administrator');
-        handleLogout();
+    const unsubLockout = socketService.on(
+      'session:lockout',
+      (data) => {
+        if (viewState === 'chat') {
+          alert(
+            data.reason ||
+              'Sanctuary session terminated by Administrator'
+          );
+
+          handleLogout();
+        }
       }
-    });
+    );
 
     return () => {
       unsubTime();
+      unsubProfileUpdate();
       unsubIncomingCall();
       unsubOfferCall();
       unsubCallEnd();
@@ -156,50 +266,86 @@ setTimeStatus(meRes.timeStatus);
     setViewState('select');
   };
 
-  const handleSelectUser = (userId: 'person_1' | 'person_2') => {
+  const handleSelectUser = (
+    userId: 'person_1' | 'person_2'
+  ) => {
     SoundEffects.playAtmosphereChime();
     setSelectedUserId(userId);
     setViewState('password');
   };
 
-  const handlePasswordSubmit = async (password: string) => {   if (!selectedUserId) return;    const loginRes = await ApiService.login(selectedUserId, password);    // Set the logged-in user's latest profile   setCurrentUser(loginRes.user);    // Set the logged-in user's profile   if (loginRes.user.id === 'person_1') {     setPerson1(loginRes.user);   } else {     setPerson2(loginRes.user);   }    // IMPORTANT: update the OTHER person's complete profile too,   // including their pfpUrl.   if (loginRes.otherUser.id === 'person_1') {     setPerson1((prev) => ({       ...(prev || {}),       ...loginRes.otherUser,     } as UserProfile));   } else {     setPerson2((prev) => ({       ...(prev || {}),       ...loginRes.otherUser,     } as UserProfile));   }    setSettings(loginRes.settings);   setTimeStatus(loginRes.timeStatus);    // Connect WebSocket   socketService.connect(loginRes.token);    // Fetch conversation   const msgs = await ApiService.getMessages();   setMessages(msgs);    SoundEffects.playSent();   setViewState('chat'); };
-  if (!selectedUserId) return;
+  // LOGIN
+  const handlePasswordSubmit = async (password: string) => {
+    if (!selectedUserId) return;
 
-  const loginRes = await ApiService.login(selectedUserId, password);
+    const loginRes = await ApiService.login(
+      selectedUserId,
+      password
+    );
 
-  // Keep the authenticated user's latest profile data everywhere.
-  setCurrentUser(loginRes.user);
+    // Store logged-in user's latest profile
+    setCurrentUser(loginRes.user);
 
-  if (loginRes.user.id === 'person_1') {
-    setPerson1(loginRes.user);
-  } else {
-    setPerson2(loginRes.user);
-  }
+    if (loginRes.user.id === 'person_1') {
+      setPerson1(loginRes.user);
+    } else {
+      setPerson2(loginRes.user);
+    }
 
-  setSettings(loginRes.settings);
-  setTimeStatus(loginRes.timeStatus);
+    // IMPORTANT:
+    // Store the OTHER user's latest profile as well.
+    // This includes their real pfpUrl.
+    if (loginRes.otherUser.id === 'person_1') {
+      setPerson1((prev) => ({
+        ...(prev || {}),
+        ...loginRes.otherUser,
+      } as UserProfile));
+    } else {
+      setPerson2((prev) => ({
+        ...(prev || {}),
+        ...loginRes.otherUser,
+      } as UserProfile));
+    }
 
-  // Connect WebSocket
-  socketService.connect(loginRes.token);
+    setSettings(loginRes.settings);
+    setTimeStatus(loginRes.timeStatus);
 
-  // Fetch conversation
-  const msgs = await ApiService.getMessages();
-  setMessages(msgs);
+    // Connect WebSocket
+    socketService.connect(loginRes.token);
 
-  SoundEffects.playSent();
-  setViewState('chat');
-};
+    // Fetch conversation
+    const msgs = await ApiService.getMessages();
+    setMessages(msgs);
+
+    SoundEffects.playSent();
+    setViewState('chat');
+  };
 
   const handleLogout = async () => {
-    await ApiService.logout();
+    try {
+      await ApiService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+
     socketService.disconnect();
+
     setCurrentUser(null);
     setSelectedUserId(null);
+    setActiveCall(null);
+    setMessages([]);
+
     setViewState('select');
   };
 
-  const handleStartCall = (callType: 'voice' | 'video') => {
-    const other = currentUser?.id === 'person_1' ? person2 : person1;
+  const handleStartCall = (
+    callType: 'voice' | 'video'
+  ) => {
+    const other =
+      currentUser?.id === 'person_1'
+        ? person2
+        : person1;
+
     if (!other) return;
 
     setActiveCall({
@@ -208,25 +354,32 @@ setTimeStatus(meRes.timeStatus);
       callType,
       otherUserId: other.id,
       otherUserName: other.name,
-      otherUserPfp: other.pfpUrl,
+      otherUserPfp: other.pfpUrl || '',
     });
   };
 
+  // Loading screen
   if (viewState === 'loading' || !person1 || !person2) {
     return (
       <div className="fixed inset-0 bg-[#03050a] flex flex-col items-center justify-center text-slate-100 select-none">
-        <CosmicBackground theme={settings?.theme || 'celestial'} />
+        <CosmicBackground
+          theme={settings?.theme || 'celestial'}
+        />
+
         <div className="relative z-10 flex flex-col items-center gap-5">
           <div className="relative">
             <div className="w-12 h-12 rounded-full border border-indigo-400/30 flex items-center justify-center bg-slate-950/70 backdrop-blur-xl shadow-[0_0_30px_rgba(99,102,241,0.35)]">
               <Loader2 className="w-5 h-5 animate-spin text-indigo-300" />
             </div>
+
             <div className="absolute -inset-2.5 rounded-full border border-indigo-400/15 animate-pulse pointer-events-none" />
           </div>
+
           <div className="text-center space-y-1.5">
             <h2 className="text-base font-bold uppercase tracking-anime-wide font-cinzel text-transparent bg-clip-text bg-gradient-to-b from-white via-indigo-100 to-indigo-300 text-shadow-anime-glow">
               SYNAX
             </h2>
+
             <p className="text-[11px] uppercase tracking-anime-pill font-sans-celestial text-slate-400 font-light text-shadow-subtle">
               Where Two Worlds Meet
             </p>
@@ -236,12 +389,19 @@ setTimeStatus(meRes.timeStatus);
     );
   }
 
-  const otherUser = currentUser?.id === 'person_1' ? person2 : person1;
-  const selectedUser = selectedUserId === 'person_1' ? person1 : person2;
+  const otherUser =
+    currentUser?.id === 'person_1'
+      ? person2
+      : person1;
+
+  const selectedUser =
+    selectedUserId === 'person_1'
+      ? person1
+      : person2;
 
   return (
     <div className="min-h-screen bg-[#03050a] text-slate-100 font-sans-celestial antialiased selection:bg-indigo-500/30 selection:text-indigo-200 overflow-hidden">
-      {/* Dynamic Cosmic Universe Background Canvas */}
+      {/* Dynamic Cosmic Universe Background */}
       <CosmicBackground
         theme={settings?.theme || 'celestial'}
         activeSide={
@@ -259,10 +419,21 @@ setTimeStatus(meRes.timeStatus);
         {viewState === 'intro' && (
           <CinematicIntro
             key="cinematic-intro"
-            person1={{ name: person1.name, logo: person1.logo }}
-            person2={{ name: person2.name, logo: person2.logo }}
-            worldTitle={settings?.worldTitle || 'SYNAX'}
-            worldSubtitle={settings?.worldSubtitle || 'Where Two Worlds Meet.'}
+            person1={{
+              name: person1.name,
+              logo: person1.logo,
+            }}
+            person2={{
+              name: person2.name,
+              logo: person2.logo,
+            }}
+            worldTitle={
+              settings?.worldTitle || 'SYNAX'
+            }
+            worldSubtitle={
+              settings?.worldSubtitle ||
+              'Where Two Worlds Meet.'
+            }
             onComplete={handleIntroComplete}
           />
         )}
@@ -273,45 +444,60 @@ setTimeStatus(meRes.timeStatus);
             key="identity-select"
             person1={person1 as any}
             person2={person2 as any}
-            worldTitle={settings?.worldTitle || 'SYNAX'}
-            worldSubtitle={settings?.worldSubtitle || 'Where Two Worlds Meet.'}
+            worldTitle={
+              settings?.worldTitle || 'SYNAX'
+            }
+            worldSubtitle={
+              settings?.worldSubtitle ||
+              'Where Two Worlds Meet.'
+            }
             onSelect={handleSelectUser}
-            onOpenAdmin={() => setShowAdminLogin(true)}
-            onReplayIntro={() => setViewState('intro')}
+            onOpenAdmin={() =>
+              setShowAdminLogin(true)
+            }
+            onReplayIntro={() =>
+              setViewState('intro')
+            }
             onHoverRealm={setActiveSide}
           />
         )}
 
         {/* VIEW 3: PASSWORD SCREEN */}
-        {viewState === 'password' && selectedUser && (
-          <PasswordModal
-            key="password-modal"
-            userId={selectedUser.id as any}
-            name={selectedUser.name}
-            username={selectedUser.username}
-            logo={selectedUser.logo}
-            onSubmit={handlePasswordSubmit}
-            onBack={() => {
-              setActiveSide('both');
-              setViewState('select');
-            }}
-          />
-        )}
+        {viewState === 'password' &&
+          selectedUser && (
+            <PasswordModal
+              key="password-modal"
+              userId={selectedUser.id as any}
+              name={selectedUser.name}
+              username={selectedUser.username}
+              logo={selectedUser.logo}
+              onSubmit={handlePasswordSubmit}
+              onBack={() => {
+                setActiveSide('both');
+                setViewState('select');
+              }}
+            />
+          )}
 
         {/* VIEW 4: MAIN SYNAX SANCTUARY CHAT UI */}
-        {viewState === 'chat' && currentUser && otherUser && settings && (
-          <ChatRoom
-            key="chat-room"
-            currentUser={currentUser}
-            otherUser={otherUser}
-            initialMessages={messages}
-            settings={settings}
-            timeStatus={timeStatus}
-            onLogout={handleLogout}
-            onOpenProfile={() => setShowProfileModal(true)}
-            onStartCall={handleStartCall}
-          />
-        )}
+        {viewState === 'chat' &&
+          currentUser &&
+          otherUser &&
+          settings && (
+            <ChatRoom
+              key="chat-room"
+              currentUser={currentUser}
+              otherUser={otherUser}
+              initialMessages={messages}
+              settings={settings}
+              timeStatus={timeStatus}
+              onLogout={handleLogout}
+              onOpenProfile={() =>
+                setShowProfileModal(true)
+              }
+              onStartCall={handleStartCall}
+            />
+          )}
 
         {/* VIEW 5: PROTECTED ADMIN PANEL */}
         {viewState === 'admin' && (
@@ -325,37 +511,50 @@ setTimeStatus(meRes.timeStatus);
         )}
       </AnimatePresence>
 
-      {/* MODAL: ADMIN MASTER LOGIN */}
+      {/* ADMIN LOGIN */}
       <AdminLoginModal
         isOpen={showAdminLogin}
-        onClose={() => setShowAdminLogin(false)}
+        onClose={() =>
+          setShowAdminLogin(false)
+        }
         onSuccess={() => {
           setShowAdminLogin(false);
           setViewState('admin');
         }}
       />
 
-      {/* MODAL: USER PFP & PROFILE SETTINGS */}
+      {/* USER PROFILE MODAL */}
       <AnimatePresence>
-        {showProfileModal && currentUser && (
-          <UserProfileModal
-            user={currentUser}
-            onClose={() => setShowProfileModal(false)}
-            onProfileUpdated={(updated) => {
-              setCurrentUser(updated);
-              if (updated.id === 'person_1') setPerson1(updated);
-              else setPerson2(updated);
-            }}
-          />
-        )}
+        {showProfileModal &&
+          currentUser && (
+            <UserProfileModal
+              user={currentUser}
+              onClose={() =>
+                setShowProfileModal(false)
+              }
+              onProfileUpdated={(updated) => {
+                // Update current user
+                setCurrentUser(updated);
+
+                // Update correct global user profile
+                if (updated.id === 'person_1') {
+                  setPerson1(updated);
+                } else {
+                  setPerson2(updated);
+                }
+              }}
+            />
+          )}
       </AnimatePresence>
 
-      {/* MODAL: WEBRTC CALLING INTERFACE */}
+      {/* WEBRTC CALLING INTERFACE */}
       <AnimatePresence>
         {activeCall && (
           <CallModal
             callState={activeCall}
-            onClose={() => setActiveCall(null)}
+            onClose={() =>
+              setActiveCall(null)
+            }
           />
         )}
       </AnimatePresence>
