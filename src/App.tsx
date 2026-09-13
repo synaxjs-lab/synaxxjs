@@ -47,10 +47,18 @@ export default function App() {
         const storedToken = localStorage.getItem('synax_user_token');
         if (storedToken) {
           try {
-            const meRes = await ApiService.getMe();
-            setCurrentUser(meRes.user);
-            setSettings(meRes.settings);
-            setTimeStatus(meRes.timeStatus);
+           const meRes = await ApiService.getMe();
+
+setCurrentUser(meRes.user);
+
+if (meRes.user.id === 'person_1') {
+  setPerson1(meRes.user);
+} else {
+  setPerson2(meRes.user);
+}
+
+setSettings(meRes.settings);
+setTimeStatus(meRes.timeStatus);
 
             // Connect socket
             socketService.connect(storedToken);
@@ -155,22 +163,32 @@ export default function App() {
   };
 
   const handlePasswordSubmit = async (password: string) => {
-    if (!selectedUserId) return;
-    const loginRes = await ApiService.login(selectedUserId, password);
-    setCurrentUser(loginRes.user);
-    setSettings(loginRes.settings);
-    setTimeStatus(loginRes.timeStatus);
+  if (!selectedUserId) return;
 
-    // Connect WebSocket
-    socketService.connect(loginRes.token);
+  const loginRes = await ApiService.login(selectedUserId, password);
 
-    // Fetch conversation
-    const msgs = await ApiService.getMessages();
-    setMessages(msgs);
+  // Keep the authenticated user's latest profile data everywhere.
+  setCurrentUser(loginRes.user);
 
-    SoundEffects.playSent();
-    setViewState('chat');
-  };
+  if (loginRes.user.id === 'person_1') {
+    setPerson1(loginRes.user);
+  } else {
+    setPerson2(loginRes.user);
+  }
+
+  setSettings(loginRes.settings);
+  setTimeStatus(loginRes.timeStatus);
+
+  // Connect WebSocket
+  socketService.connect(loginRes.token);
+
+  // Fetch conversation
+  const msgs = await ApiService.getMessages();
+  setMessages(msgs);
+
+  SoundEffects.playSent();
+  setViewState('chat');
+};
 
   const handleLogout = async () => {
     await ApiService.logout();
