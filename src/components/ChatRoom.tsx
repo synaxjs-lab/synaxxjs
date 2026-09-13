@@ -255,7 +255,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
         <div className="flex items-center gap-3">
           <div className="relative">
             <img
-              src={otherUser.pfpUrl}}
+              src={otherUser.pfpUrl}
               alt={otherUser.name}
               className="w-10 h-10 rounded-full object-cover border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
             />
