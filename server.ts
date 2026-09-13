@@ -1514,10 +1514,10 @@ async function startServer() {
     res.json({ success: true, user: db.users[userId] });
   });
 
-  // Admin: Reset Time / Grant Extra Time
+  // Admin: Set / Add / Remove / Reset User Time
   app.post('/api/admin/user/:id/reset-time', requireAdminAuth, (req: Request, res: Response) => {
     const userId = req.params.id as 'person_1' | 'person_2';
-    const { addMinutes, resetSession } = req.body;
+    const { addMinutes, setMinutes, resetSession } = req.body;
 
     if (userId !== 'person_1' && userId !== 'person_2') {
       res.status(400).json({ error: 'Invalid user' });
@@ -1525,21 +1525,82 @@ async function startServer() {
     }
 
     const user = db.users[userId] as any;
+
+    if (setMinutes !== undefined) {
+      const parsedMinutes = Number(setMinutes);
+
+      if (!Number.isFinite(parsedMinutes)) {
+        res.status(400).json({ error: 'Invalid time limit' });
+        return;
+      }
+
+      // 1 minute is the minimum finite limit.
+      // 0 is intentionally not allowed because 0 previously meant unlimited.
+      user.allowedMinutes = Math.max(1, Math.floor(parsedMinutes));
+    }
+
+    if (addMinutes !== undefined) {
+      const delta = Number(addMinutes);
+
+      if (!Number.isFinite(delta)) {
+        res.status(400).json({ error: 'Invalid time adjustment' });
+        return;
+      }
+
+      // Never allow the limit to reach 0, because 0 means unlimited
+      // in the time-calculation model.
+      user.allowedMinutes = Math.max(
+        1,
+        Math.floor(Number(user.allowedMinutes || 1) + delta)
+      );
+    }
+
     if (resetSession) {
       const now = Date.now();
+
       user.activeUsageSeconds = 0;
       user.dailyUsageSeconds = 0;
-      user.dailyUsageDate = new Date(now).toISOString().slice(0, 10);
-      user.sessionStartTimestamp = Number(user.activeSessionCount || 0) > 0 ? now : undefined;
-      user.activeSessionStartedAt = Number(user.activeSessionCount || 0) > 0 ? now : undefined;
-    }
-    if (addMinutes) {
-      user.allowedMinutes += Number(addMinutes);
+      user.dailyUsageDate = new Date(now)
+        .toISOString()
+        .slice(0, 10);
+
+      const hasActiveSockets =
+        Number(user.activeSessionCount || 0) > 0;
+
+      user.sessionStartTimestamp = hasActiveSockets
+        ? now
+        : undefined;
+
+      user.activeSessionStartedAt = hasActiveSockets
+        ? now
+        : undefined;
     }
 
     saveDbSync();
+
     const newStatus = calculateTimeRemaining(userId);
-    addLog('Admin', `Adjusted Time for ${user.name}`, `Reset session: ${!!resetSession}, Added: ${addMinutes || 0}m`);
+
+    const changes: string[] = [];
+
+    if (setMinutes !== undefined) {
+      changes.push(`Set limit: ${user.allowedMinutes}m`);
+    }
+
+    if (addMinutes !== undefined) {
+      changes.push(
+        `${Number(addMinutes) >= 0 ? 'Added' : 'Removed'}: ${Math.abs(Number(addMinutes))}m`
+      );
+    }
+
+    if (resetSession) {
+      changes.push('Usage reset');
+    }
+
+    addLog(
+      'Admin',
+      `Adjusted Time for ${user.name}`,
+      changes.join(', ') || 'No time change'
+    );
 
     broadcast({
       type: 'time:tick',
@@ -1547,7 +1608,12 @@ async function startServer() {
       timeStatus: newStatus
     });
 
-    res.json({ success: true, timeStatus: newStatus });
+    res.json({
+      success: true,
+      timeStatus: newStatus,
+      userId,
+      allowedMinutes: user.allowedMinutes
+    });
   });
 
   // Admin: Update App & Communication Settings
@@ -1709,7 +1775,3 @@ startServer().catch((error) => {
   console.error('✦ SYNAX failed to start:', error);
   process.exit(1);
 });
-
-
-
-
