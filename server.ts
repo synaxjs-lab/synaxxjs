@@ -244,6 +244,7 @@ const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SUPABASE_STATE_TABLE = 'synax_state';
 const SUPABASE_STATE_ID = 'main';
+const SUPABASE_SESSIONS_TABLE = 'synax_sessions';
 const isProduction = process.env.NODE_ENV === 'production';
 const useSupabase = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 
@@ -290,6 +291,73 @@ async function loadDbFromSupabase(): Promise<DbSchema | null> {
   const res = await supabaseFetch(`/rest/v1/${SUPABASE_STATE_TABLE}?id=eq.${encodeURIComponent(SUPABASE_STATE_ID)}&select=state&limit=1`);
   const rows = await res.json() as Array<{ state: DbSchema }>;
   return rows[0]?.state || null;
+}
+
+async function getSessionFromSupabase(token: string): Promise<DbSchema['sessions'][string] | null> {
+  if (!useSupabase) return db.sessions[token] || null;
+  const res = await supabaseFetch(
+    `/rest/v1/${SUPABASE_SESSIONS_TABLE}?token=eq.${encodeURIComponent(token)}&select=token,user_id,session_start,last_active,allowed_seconds,is_expired,active,ended_at&limit=1`
+  );
+  const rows = await res.json() as any[];
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    token: row.token,
+    userId: row.user_id,
+    sessionStart: Number(row.session_start),
+    lastActive: Number(row.last_active),
+    allowedSeconds: Number(row.allowed_seconds),
+    isExpired: Boolean(row.is_expired),
+    active: Boolean(row.active),
+    ...(row.ended_at == null ? {} : { endedAt: Number(row.ended_at) }),
+  } as DbSchema['sessions'][string];
+}
+
+async function saveSessionToSupabase(session: DbSchema['sessions'][string]) {
+  if (!useSupabase) {
+    db.sessions[session.token] = session;
+    return;
+  }
+  await supabaseFetch(`/rest/v1/${SUPABASE_SESSIONS_TABLE}?on_conflict=token`, {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({
+      token: session.token,
+      user_id: session.userId,
+      session_start: session.sessionStart,
+      last_active: session.lastActive,
+      allowed_seconds: session.allowedSeconds,
+      is_expired: session.isExpired,
+      active: Boolean(session.active),
+      ended_at: session.endedAt ?? null,
+    }),
+  });
+}
+
+async function deleteSessionFromSupabase(token: string) {
+  if (!useSupabase) {
+    delete db.sessions[token];
+    return;
+  }
+  await supabaseFetch(`/rest/v1/${SUPABASE_SESSIONS_TABLE}?token=eq.${encodeURIComponent(token)}`, { method: 'DELETE' });
+}
+
+async function listSessionsFromSupabase() {
+  if (!useSupabase) return Object.values(db.sessions);
+  const res = await supabaseFetch(
+    `/rest/v1/${SUPABASE_SESSIONS_TABLE}?select=token,user_id,session_start,last_active,allowed_seconds,is_expired,active,ended_at&order=session_start.desc`
+  );
+  const rows = await res.json() as any[];
+  return rows.map((row) => ({
+    token: row.token,
+    userId: row.user_id,
+    sessionStart: Number(row.session_start),
+    lastActive: Number(row.last_active),
+    allowedSeconds: Number(row.allowed_seconds),
+    isExpired: Boolean(row.is_expired),
+    active: Boolean(row.active),
+    ...(row.ended_at == null ? {} : { endedAt: Number(row.ended_at) }),
+  }));
 }
 
 async function ensureSupabaseSchemaRow(seed: DbSchema) {
@@ -358,6 +426,11 @@ async function initializeDatabase() {
         user.activeSessionCount = 0;
         user.activeSessionStartedAt = undefined;
       }
+      // Migrate any legacy sessions from synax_state into the dedicated session table.
+      for (const session of Object.values(db.sessions) as any[]) {
+        try { await saveSessionToSupabase(session); } catch (err) { console.error('Session migration failed:', err); }
+      }
+
       // A container restart ends live socket activity. Persisted login tokens remain valid,
       // but are re-activated when the browser reconnects its WebSocket. No downtime is charged.
       for (const session of Object.values(db.sessions) as any[]) session.active = false;
@@ -463,7 +536,36 @@ function getPresence(): { person_1: boolean; person_2: boolean; lastSeen_1: numb
   };
 }
 
-// Calculate server-authoritative time remaining for a user
+// ============================================================
+// SERVER-AUTHORITATIVE TIME SYSTEM
+// Daily limits reset at 00:00 Asia/Kolkata every day.
+// ============================================================
+const APP_TIME_ZONE = 'Asia/Kolkata';
+
+function getLocalDateKey(timestamp = Date.now()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(timestamp));
+}
+
+function getStartOfLocalDay(timestamp = Date.now()): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(timestamp));
+
+  const year = Number(parts.find((p) => p.type === 'year')?.value);
+  const month = Number(parts.find((p) => p.type === 'month')?.value);
+  const day = Number(parts.find((p) => p.type === 'day')?.value);
+
+  return Date.UTC(year, month - 1, day) - (5 * 60 + 30) * 60 * 1000;
+}
+
 function calculateTimeRemaining(userId: 'person_1' | 'person_2'): {
   hasLimit: boolean;
   mode: 'continuous' | 'daily';
@@ -482,18 +584,51 @@ function calculateTimeRemaining(userId: 'person_1' | 'person_2'): {
   const now = Date.now();
 
   let usedSeconds = 0;
+
   if (strategy === 'continuous') {
     usedSeconds = Number(user.activeUsageSeconds || 0);
-    if (user.activeSessionStartedAt && Number(user.activeSessionCount || 0) > 0) {
-      usedSeconds += Math.max(0, Math.floor((now - user.activeSessionStartedAt) / 1000));
+
+    if (
+      user.activeSessionStartedAt &&
+      Number(user.activeSessionCount || 0) > 0
+    ) {
+      usedSeconds += Math.max(
+        0,
+        Math.floor(
+          (now - Number(user.activeSessionStartedAt)) / 1000
+        )
+      );
     }
   } else {
-    const today = new Date(now).toISOString().slice(0, 10);
-    usedSeconds = user.dailyUsageDate === today ? Number(user.dailyUsageSeconds || 0) : 0;
+    const today = getLocalDateKey(now);
+    const dayStart = getStartOfLocalDay(now);
+
+    usedSeconds =
+      user.dailyUsageDate === today
+        ? Number(user.dailyUsageSeconds || 0)
+        : 0;
+
+    if (
+      user.activeSessionStartedAt &&
+      Number(user.activeSessionCount || 0) > 0
+    ) {
+      const activeStart = Number(user.activeSessionStartedAt);
+      const billableStart = Math.max(activeStart, dayStart);
+
+      usedSeconds += Math.max(
+        0,
+        Math.floor((now - billableStart) / 1000)
+      );
+    }
   }
 
-  const remainingSeconds = Math.max(0, allowedSeconds - usedSeconds);
-  const isExpired = hasLimit && remainingSeconds <= 0;
+  const remainingSeconds = Math.max(
+    0,
+    allowedSeconds - usedSeconds
+  );
+
+  const isExpired =
+    hasLimit && remainingSeconds <= 0;
 
   return {
     hasLimit,
@@ -503,20 +638,32 @@ function calculateTimeRemaining(userId: 'person_1' | 'person_2'): {
     isExpired,
     customMessage: db.settings.timeOverMessage,
     serverTimestamp: now,
-    warnings: (db.settings.warningMinutes || [10, 5, 1]).map(m => m * 60)
+    warnings: (db.settings.warningMinutes || [10, 5, 1]).map(
+      (m) => m * 60
+    )
   };
 }
 
 function startActiveSession(userId: 'person_1' | 'person_2') {
   const user = db.users[userId] as any;
   const now = Date.now();
-  const today = new Date(now).toISOString().slice(0, 10);
-  if (db.settings.timeStrategy === 'daily' && user.dailyUsageDate !== today) {
-    user.dailyUsageDate = today;
-    user.dailyUsageSeconds = 0;
+
+  if (db.settings.timeStrategy === 'daily') {
+    const today = getLocalDateKey(now);
+
+    if (user.dailyUsageDate !== today) {
+      user.dailyUsageDate = today;
+      user.dailyUsageSeconds = 0;
+    }
   }
-  user.activeSessionCount = Number(user.activeSessionCount || 0) + 1;
-  if (!user.activeSessionStartedAt) user.activeSessionStartedAt = now;
+
+  user.activeSessionCount =
+    Number(user.activeSessionCount || 0) + 1;
+
+  if (!user.activeSessionStartedAt) {
+    user.activeSessionStartedAt = now;
+  }
+
   user.sessionStartTimestamp = user.activeSessionStartedAt;
   user.lastActiveTimestamp = now;
   saveDbSync();
@@ -527,38 +674,100 @@ function stopActiveSession(userId: 'person_1' | 'person_2') {
   const count = Number(user.activeSessionCount || 0);
   if (count <= 0) return;
 
+  const now = Date.now();
+
   if (user.activeSessionStartedAt) {
-    const elapsed = Math.max(0, Math.floor((Date.now() - user.activeSessionStartedAt) / 1000));
+    const activeStart = Number(user.activeSessionStartedAt);
+
     if (db.settings.timeStrategy === 'daily') {
-      user.dailyUsageDate = new Date().toISOString().slice(0, 10);
-      user.dailyUsageSeconds = Number(user.dailyUsageSeconds || 0) + elapsed;
+      const today = getLocalDateKey(now);
+      const dayStart = getStartOfLocalDay(now);
+
+      if (user.dailyUsageDate !== today) {
+        user.dailyUsageDate = today;
+        user.dailyUsageSeconds = 0;
+      }
+
+      const billableStart = Math.max(
+        activeStart,
+        dayStart
+      );
+
+      const elapsed = Math.max(
+        0,
+        Math.floor((now - billableStart) / 1000)
+      );
+
+      user.dailyUsageSeconds =
+        Number(user.dailyUsageSeconds || 0) + elapsed;
     } else {
-      user.activeUsageSeconds = Number(user.activeUsageSeconds || 0) + elapsed;
+      const elapsed = Math.max(
+        0,
+        Math.floor((now - activeStart) / 1000)
+      );
+
+      user.activeUsageSeconds =
+        Number(user.activeUsageSeconds || 0) + elapsed;
     }
   }
+
   user.activeSessionCount = Math.max(0, count - 1);
-  user.activeSessionStartedAt = user.activeSessionCount > 0 ? Date.now() : undefined;
+  user.activeSessionStartedAt =
+    user.activeSessionCount > 0 ? now : undefined;
   user.sessionStartTimestamp = user.activeSessionStartedAt;
-  user.lastActiveTimestamp = Date.now();
+  user.lastActiveTimestamp = now;
+
   saveDbSync();
 }
+
 function checkpointActiveUsage(userId: 'person_1' | 'person_2') {
   const user = db.users[userId] as any;
-  if (!user.activeSessionStartedAt || Number(user.activeSessionCount || 0) <= 0) return;
+
+  if (
+    !user.activeSessionStartedAt ||
+    Number(user.activeSessionCount || 0) <= 0
+  ) {
+    return;
+  }
+
   const now = Date.now();
-  const elapsed = Math.max(0, Math.floor((now - user.activeSessionStartedAt) / 1000));
-  if (elapsed <= 0) return;
+  const activeStart = Number(user.activeSessionStartedAt);
 
   if (db.settings.timeStrategy === 'daily') {
-    const today = new Date(now).toISOString().slice(0, 10);
+    const today = getLocalDateKey(now);
+    const dayStart = getStartOfLocalDay(now);
+
     if (user.dailyUsageDate !== today) {
       user.dailyUsageDate = today;
       user.dailyUsageSeconds = 0;
     }
-    user.dailyUsageSeconds = Number(user.dailyUsageSeconds || 0) + elapsed;
+
+    const billableStart = Math.max(
+      activeStart,
+      dayStart
+    );
+
+    const elapsed = Math.max(
+      0,
+      Math.floor((now - billableStart) / 1000)
+    );
+
+    if (elapsed > 0) {
+      user.dailyUsageSeconds =
+        Number(user.dailyUsageSeconds || 0) + elapsed;
+    }
   } else {
-    user.activeUsageSeconds = Number(user.activeUsageSeconds || 0) + elapsed;
+    const elapsed = Math.max(
+      0,
+      Math.floor((now - activeStart) / 1000)
+    );
+
+    if (elapsed > 0) {
+      user.activeUsageSeconds =
+        Number(user.activeUsageSeconds || 0) + elapsed;
+    }
   }
+
   user.activeSessionStartedAt = now;
   user.sessionStartTimestamp = now;
   user.lastActiveTimestamp = now;
@@ -567,14 +776,21 @@ function checkpointActiveUsage(userId: 'person_1' | 'person_2') {
 
 
 // Middleware: Authenticate User
-function requireUserAuth(req: Request, res: Response, next: NextFunction): void {
+async function requireUserAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Unauthorized: Missing token' });
     return;
   }
   const token = authHeader.split(' ')[1];
-  const session = db.sessions[token];
+  let session: DbSchema['sessions'][string] | null = null;
+  try {
+    session = await getSessionFromSupabase(token);
+  } catch (err) {
+    console.error('Failed to validate user session:', err);
+    res.status(503).json({ error: 'Authentication service temporarily unavailable' });
+    return;
+  }
 
   if (!session || (session.userId !== 'person_1' && session.userId !== 'person_2')) {
     res.status(401).json({ error: 'Invalid or expired session' });
@@ -615,18 +831,26 @@ function requireUserAuth(req: Request, res: Response, next: NextFunction): void 
 }
 
 // Middleware: Authenticate Admin
-function requireAdminAuth(req: Request, res: Response, next: NextFunction): void {
+async function requireAdminAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Admin unauthorized' });
     return;
   }
   const token = authHeader.split(' ')[1];
-  const session = db.sessions[token];
+  let session: DbSchema['sessions'][string] | null = null;
+  try {
+    session = await getSessionFromSupabase(token);
+  } catch (err) {
+    console.error('Failed to validate admin session:', err);
+    res.status(503).json({ error: 'Authentication service temporarily unavailable' });
+    return;
+  }
   if (!session || session.userId !== 'admin') {
     res.status(401).json({ error: 'Invalid admin credentials' });
     return;
   }
+  (req as any).session = session;
   next();
 }
 
@@ -671,7 +895,7 @@ async function startServer() {
         const data = JSON.parse(rawData.toString());
 
         if (data.type === 'auth') {
-          const session = db.sessions[data.token];
+          const session = await getSessionFromSupabase(data.token);
           if (session) {
             clientInfo = { userId: session.userId, role: session.userId === 'admin' ? 'admin' : 'user' };
             clients.set(ws, clientInfo);
@@ -953,6 +1177,7 @@ async function startServer() {
       active: true
     };
 
+    await saveSessionToSupabase(db.sessions[token]);
     saveDbSync();
     addLog(userId, 'User Logged In', `Session started: ${user.name} entered the sanctuary`);
     // Vercel can route the next request to another container. Do not return the
@@ -998,7 +1223,14 @@ async function startServer() {
       return;
     }
     const token = authHeader.split(' ')[1];
-    const session = db.sessions[token];
+    let session: DbSchema['sessions'][string] | null = null;
+    try {
+      session = await getSessionFromSupabase(token);
+    } catch (err) {
+      console.error('Failed to load session for logout:', err);
+      res.status(503).json({ error: 'Authentication service temporarily unavailable' });
+      return;
+    }
     if (!session) {
       res.json({ success: true });
       return;
@@ -1008,6 +1240,7 @@ async function startServer() {
     }
     session.endedAt = Date.now();
     session.active = false;
+    await deleteSessionFromSupabase(token);
     delete db.sessions[token];
     saveDbSync();
     await flushPersistence();
@@ -1034,6 +1267,7 @@ async function startServer() {
       isExpired: false
     };
 
+    await saveSessionToSupabase(db.sessions[token]);
     saveDbSync();
     addLog('Admin Portal', 'Admin Login Success', 'Admin authenticated into System Controls');
     // Ensure the token exists in shared storage before the frontend starts
@@ -1048,14 +1282,21 @@ async function startServer() {
   });
 
   // Current session status verification
-  app.get('/api/auth/me', (req: Request, res: Response) => {
+  app.get('/api/auth/me', async (req: Request, res: Response) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       res.status(401).json({ error: 'No token' });
       return;
     }
     const token = authHeader.split(' ')[1];
-    const session = db.sessions[token];
+    let session: DbSchema['sessions'][string] | null = null;
+    try {
+      session = await getSessionFromSupabase(token);
+    } catch (err) {
+      console.error('Failed to validate session:', err);
+      res.status(503).json({ error: 'Authentication service temporarily unavailable' });
+      return;
+    }
     if (!session) {
       res.status(401).json({ error: 'Session expired' });
       return;
@@ -1514,10 +1755,10 @@ async function startServer() {
     res.json({ success: true, user: db.users[userId] });
   });
 
-  // Admin: Set / Add / Remove / Reset User Time
+  // Admin: Reset Time / Grant Extra Time
   app.post('/api/admin/user/:id/reset-time', requireAdminAuth, (req: Request, res: Response) => {
     const userId = req.params.id as 'person_1' | 'person_2';
-    const { addMinutes, setMinutes, resetSession } = req.body;
+    const { addMinutes, resetSession } = req.body;
 
     if (userId !== 'person_1' && userId !== 'person_2') {
       res.status(400).json({ error: 'Invalid user' });
@@ -1525,82 +1766,21 @@ async function startServer() {
     }
 
     const user = db.users[userId] as any;
-
-    if (setMinutes !== undefined) {
-      const parsedMinutes = Number(setMinutes);
-
-      if (!Number.isFinite(parsedMinutes)) {
-        res.status(400).json({ error: 'Invalid time limit' });
-        return;
-      }
-
-      // 1 minute is the minimum finite limit.
-      // 0 is intentionally not allowed because 0 previously meant unlimited.
-      user.allowedMinutes = Math.max(1, Math.floor(parsedMinutes));
-    }
-
-    if (addMinutes !== undefined) {
-      const delta = Number(addMinutes);
-
-      if (!Number.isFinite(delta)) {
-        res.status(400).json({ error: 'Invalid time adjustment' });
-        return;
-      }
-
-      // Never allow the limit to reach 0, because 0 means unlimited
-      // in the time-calculation model.
-      user.allowedMinutes = Math.max(
-        1,
-        Math.floor(Number(user.allowedMinutes || 1) + delta)
-      );
-    }
-
     if (resetSession) {
       const now = Date.now();
-
       user.activeUsageSeconds = 0;
       user.dailyUsageSeconds = 0;
-      user.dailyUsageDate = new Date(now)
-        .toISOString()
-        .slice(0, 10);
-
-      const hasActiveSockets =
-        Number(user.activeSessionCount || 0) > 0;
-
-      user.sessionStartTimestamp = hasActiveSockets
-        ? now
-        : undefined;
-
-      user.activeSessionStartedAt = hasActiveSockets
-        ? now
-        : undefined;
+      user.dailyUsageDate = new Date(now).toISOString().slice(0, 10);
+      user.sessionStartTimestamp = Number(user.activeSessionCount || 0) > 0 ? now : undefined;
+      user.activeSessionStartedAt = Number(user.activeSessionCount || 0) > 0 ? now : undefined;
+    }
+    if (addMinutes) {
+      user.allowedMinutes += Number(addMinutes);
     }
 
     saveDbSync();
-
     const newStatus = calculateTimeRemaining(userId);
-
-    const changes: string[] = [];
-
-    if (setMinutes !== undefined) {
-      changes.push(`Set limit: ${user.allowedMinutes}m`);
-    }
-
-    if (addMinutes !== undefined) {
-      changes.push(
-        `${Number(addMinutes) >= 0 ? 'Added' : 'Removed'}: ${Math.abs(Number(addMinutes))}m`
-      );
-    }
-
-    if (resetSession) {
-      changes.push('Usage reset');
-    }
-
-    addLog(
-      'Admin',
-      `Adjusted Time for ${user.name}`,
-      changes.join(', ') || 'No time change'
-    );
+    addLog('Admin', `Adjusted Time for ${user.name}`, `Reset session: ${!!resetSession}, Added: ${addMinutes || 0}m`);
 
     broadcast({
       type: 'time:tick',
@@ -1608,12 +1788,7 @@ async function startServer() {
       timeStatus: newStatus
     });
 
-    res.json({
-      success: true,
-      timeStatus: newStatus,
-      userId,
-      allowedMinutes: user.allowedMinutes
-    });
+    res.json({ success: true, timeStatus: newStatus });
   });
 
   // Admin: Update App & Communication Settings
@@ -1648,9 +1823,10 @@ async function startServer() {
     res.json({ messages: db.messages });
   });
 
-  app.get('/api/admin/sessions', requireAdminAuth, (_req: Request, res: Response) => {
-    const sessions = Object.values(db.sessions)
-      .map((s: any) => ({
+  app.get('/api/admin/sessions', requireAdminAuth, async (_req: Request, res: Response) => {
+    try {
+      const allSessions = await listSessionsFromSupabase();
+      const sessions = allSessions.map((s: any) => ({
         userId: s.userId,
         sessionStart: s.sessionStart,
         lastActive: s.lastActive,
@@ -1658,7 +1834,11 @@ async function startServer() {
         isExpired: s.isExpired,
         active: Boolean(s.active),
       }));
-    res.json({ sessions });
+      res.json({ sessions });
+    } catch (err) {
+      console.error('Failed to list sessions:', err);
+      res.status(503).json({ error: 'Session store temporarily unavailable' });
+    }
   });
 
   // Admin: Factory reset. Restores default identities/settings/chat/time and keeps the admin logged in.
