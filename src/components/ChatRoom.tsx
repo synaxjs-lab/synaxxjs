@@ -17,6 +17,7 @@ import {
   Settings,
   LogOut,
   X,
+  ChevronDown,
 } from 'lucide-react';
 import { ApiService } from '../services/api';
 import { socketService } from '../services/socket';
@@ -58,6 +59,26 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const lastScrollTopRef = useRef(0);
+  const previousMessageCountRef = useRef(messages.length);
+  const [newMessageCount, setNewMessageCount] = useState(0);
+
+  const isNearBottom = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return true;
+
+    const distanceFromBottom =
+      container.scrollHeight -
+      container.scrollTop -
+      container.clientHeight;
+
+    return distanceFromBottom < 160;
+  };
+
+  const handleMessagesScroll = () => {
+    if (isNearBottom()) {
+      setNewMessageCount(0);
+    }
+  };
 
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({
@@ -70,28 +91,44 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
     scrollToBottom('auto');
   }, []);
 
-  // New messages only pull the view down when the user is already near the bottom.
+  // New content follows the user only when they are already near the bottom.
+  // When they are reading older messages, we keep their position and show a small
+  // "New message" button instead.
   useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
+    const count = messages.length;
+    const previousCount = previousMessageCountRef.current;
 
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (count === previousCount) return;
 
-    if (distanceFromBottom < 160) {
+    previousMessageCountRef.current = count;
+
+    if (isNearBottom()) {
+      setNewMessageCount(0);
       scrollToBottom('smooth');
     }
-  }, [messages.length, isOtherTyping]);
+  }, [messages.length]);
+
+  useEffect(() => {
+    if (isNearBottom()) {
+      scrollToBottom('smooth');
+    }
+  }, [isOtherTyping]);
 
   // Real-time WebSocket Listeners
   useEffect(() => {
     const unsubMsg = socketService.on('chat:new_message', (data) => {
       if (data.message) {
+        const wasNearBottom = isNearBottom();
+
         setMessages((prev) => {
           // Guard against duplicates
           if (prev.some((m) => m.id === data.message.id)) return prev;
           return [...prev, data.message];
         });
+
+        if (!wasNearBottom) {
+          setNewMessageCount((prev) => prev + 1);
+        }
 
         if (data.message.senderId === otherUser.id) {
           SoundEffects.playReceived();
@@ -483,9 +520,11 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
       {/* Only this area scrolls */}
       <main
         ref={messagesContainerRef}
+        onScroll={handleMessagesScroll}
         className="absolute inset-0 overflow-y-auto overflow-x-hidden overscroll-contain px-2 sm:px-4 pt-[66px] md:pt-[122px] pb-[108px] md:pb-[92px]"
         style={{
           WebkitOverflowScrolling: 'touch',
+          scrollBehavior: 'auto',
         }}
       >
         {pinnedMessage && (
@@ -573,6 +612,27 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
           <div ref={messagesEndRef} className="h-px" />
         </div>
       </main>
+
+      {/* New message indicator: only appears while the user is reading older messages. */}
+      {newMessageCount > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            setNewMessageCount(0);
+            scrollToBottom('smooth');
+          }}
+          className="fixed right-3 sm:right-6 z-[60] h-9 sm:h-10 px-3 sm:px-4 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-lg border border-indigo-400/40 flex items-center gap-1.5 active:scale-95"
+          style={{
+            bottom: 'calc(88px + env(safe-area-inset-bottom))',
+          }}
+          aria-label={`Jump to ${newMessageCount} new message${newMessageCount === 1 ? '' : 's'}`}
+        >
+          <span>
+            {newMessageCount} new message{newMessageCount === 1 ? '' : 's'}
+          </span>
+          <ChevronDown className="w-4 h-4" />
+        </button>
+      )}
 
       {/* Fixed composer. Safe-area is filled with the same dark background, so no strip shows. */}
       <div
