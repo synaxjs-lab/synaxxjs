@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   UserProfile,
   ChatMessage,
   AppSettings,
-  TimeStatus
+  TimeStatus,
 } from '../types';
 import { MessageItem } from './MessageItem';
 import { MessageComposer } from './MessageComposer';
@@ -17,9 +18,6 @@ import {
   Settings,
   LogOut,
   X,
-  Sparkles,
-  Info,
-  ChevronDown
 } from 'lucide-react';
 import { ApiService } from '../services/api';
 import { socketService } from '../services/socket';
@@ -56,34 +54,58 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [showMobileHeader, setShowMobileHeader] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollTopRef = useRef(0);
 
+  // Auto-scroll on new message
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior,
-      block: 'end',
-    });
+    messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
-  const isNearBottom = () => {
-    const el = messagesContainerRef.current;
-    if (!el) return true;
-    return el.scrollHeight - el.scrollTop - el.clientHeight < 180;
-  };
-
-  // Keep the conversation at the bottom only when the user is already near the bottom.
-  // This prevents mobile users from being yanked back down while reading older messages.
   useEffect(() => {
     scrollToBottom('auto');
   }, []);
 
   useEffect(() => {
-    if (isNearBottom()) {
-      scrollToBottom('smooth');
-    }
-  }, [messages.length, isOtherTyping]);
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    let ticking = false;
+
+    const updateHeader = () => {
+      ticking = false;
+      if (window.innerWidth >= 768) {
+        if (!showMobileHeader) setShowMobileHeader(true);
+        return;
+      }
+
+      const currentTop = container.scrollTop;
+      const lastTop = lastScrollTopRef.current;
+      const delta = currentTop - lastTop;
+
+      if (currentTop <= 8) {
+        setShowMobileHeader(true);
+      } else if (delta >= 6) {
+        setShowMobileHeader(false);
+      } else if (delta <= -6) {
+        setShowMobileHeader(true);
+      }
+
+      lastScrollTopRef.current = currentTop;
+    };
+
+    const handleScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(updateHeader);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [showMobileHeader]);
 
   // Real-time WebSocket Listeners
   useEffect(() => {
@@ -255,36 +277,38 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
   return (
     <div
       id="synax-chat-room"
-      className="fixed inset-0 z-10 w-full overflow-hidden bg-[#04060c] text-slate-100 select-none"
-      style={{
-        height: '100dvh',
-        minHeight: '100dvh',
-      }}
+      className="relative z-10 w-full h-[100dvh] min-h-0 flex flex-col bg-[#04060c]/80 backdrop-blur-sm text-slate-100 overflow-hidden select-none"
     >
-      {/* Fixed top area: never scrolls */}
-      <div className="absolute inset-x-0 top-0 z-40">
-        <div className="relative z-50 w-full shrink-0">
-          <TimeBanner timeStatus={timeStatus} />
-        </div>
-
-        <header className="relative z-40 w-full min-w-0 bg-slate-950 border-b border-slate-800/80 backdrop-blur-xl">
-          <div className="w-full min-w-0 px-2 sm:px-4 md:px-6 py-2.5 flex items-center gap-2">
-            {/* Partner profile */}
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <div className="relative shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-full">
-                <div className="w-full h-full rounded-full overflow-hidden">
-                  <img
-                    src={
-                      otherUser.pfpUrl ||
-                      'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200'
-                    }
-                    alt={otherUser.name}
-                    className="block w-full h-full object-cover object-center"
-                  />
-                </div>
-
+      {/* =====================================================
+          MOBILE COMPACT CHROME
+          - No large TimeBanner on mobile
+          - One compact row only
+          - Slides away while reading / messaging
+          - Returns smoothly when scrolling upward
+      ====================================================== */}
+      <AnimatePresence initial={false}>
+        {showMobileHeader && (
+          <motion.div
+            key="mobile-chat-header"
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.14, ease: 'easeOut' }}
+            className="md:hidden shrink-0 relative z-40 bg-slate-950 border-b border-slate-800/80"
+          >
+            <div className="w-full min-w-0 h-[62px] px-1.5 flex items-center gap-1">
+              {/* PFP */}
+              <div className="relative shrink-0 w-9 h-9 rounded-full overflow-hidden border-2 border-indigo-500/50 shadow-[0_0_12px_rgba(99,102,241,0.2)]">
+                <img
+                  src={
+                    otherUser.pfpUrl ||
+                    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200'
+                  }
+                  alt={otherUser.name}
+                  className="block w-full h-full object-cover object-center"
+                />
                 <span
-                  className={`absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-slate-950 ${
+                  className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-slate-950 ${
                     otherPresence.isOnline
                       ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
                       : 'bg-slate-500'
@@ -292,47 +316,35 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                 />
               </div>
 
+              {/* Name + logo */}
               <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <h2 className="min-w-0 max-w-[105px] sm:max-w-[240px] truncate text-sm sm:text-base font-bold text-white font-cinzel tracking-anime-header text-shadow-anime-glow">
+                <div className="flex items-center min-w-0 gap-1">
+                  <h2 className="min-w-0 max-w-[70px] xs:max-w-[92px] truncate text-[11px] font-bold text-white font-cinzel tracking-anime-header text-shadow-anime-glow">
                     {otherUser.nickname || otherUser.name}
                   </h2>
-
-                  <div
-                    className="shrink-0 flex items-center justify-center"
-                    title={`Personal Mark: ${otherUser.logo.name}`}
-                  >
+                  <div className="shrink-0 flex items-center justify-center">
                     <LogoMark
                       logo={otherUser.logo}
                       size="sm"
                       glow={false}
-                      className="opacity-80"
+                      className="opacity-75 scale-90"
                     />
                   </div>
                 </div>
-
-                <p className="text-[9px] sm:text-[11px] truncate font-sans-celestial tracking-wide">
+                <p className="text-[9px] text-slate-400 truncate tracking-wide">
                   {isOtherTyping ? (
-                    <span className="text-indigo-400 font-medium">
-                      typing...
-                    </span>
+                    <span className="text-indigo-400 animate-pulse">typing...</span>
                   ) : otherPresence.isOnline ? (
-                    <span className="text-emerald-400">
-                      Online
-                    </span>
+                    <span className="text-emerald-400">Online</span>
                   ) : (
-                    <span className="text-slate-400">
-                      {formatLastSeen(otherPresence.lastSeen)}
-                    </span>
+                    formatLastSeen(otherPresence.lastSeen)
                   )}
                 </p>
               </div>
-            </div>
 
-            {/* Compact controls */}
-            <div className="shrink-0 flex items-center gap-1">
+              {/* Timer: dedicated non-overlapping space */}
               {timeStatus && (
-                <div className="relative z-50 shrink-0 min-w-[74px] sm:min-w-[88px]">
+                <div className="shrink-0 flex items-center justify-center min-w-[70px]">
                   <TimeRemainingPill
                     secondsLeft={timeStatus.remainingSeconds}
                     isExpired={timeStatus.isExpired}
@@ -340,187 +352,274 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                 </div>
               )}
 
-              {settings.featuresEnabled.voiceCalls && (
-                <button
-                  id="start-voice-call-btn"
-                  type="button"
-                  onClick={() => onStartCall('voice')}
-                  disabled={
-                    !!(
-                      timeStatus?.isExpired &&
-                      settings.restrictionsOnExpire.disableVoiceCalls
-                    )
-                  }
-                  className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-700/80 text-indigo-300 flex items-center justify-center shrink-0 disabled:opacity-40"
-                  title="Voice call"
-                >
-                  <Phone className="w-4 h-4" />
-                </button>
-              )}
+              {/* Compact controls */}
+              <div className="shrink-0 flex items-center gap-0.5">
+                {settings.featuresEnabled.voiceCalls && (
+                  <button
+                    id="start-voice-call-btn-mobile"
+                    type="button"
+                    onClick={() => onStartCall('voice')}
+                    disabled={!!(timeStatus?.isExpired && settings.restrictionsOnExpire.disableVoiceCalls)}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center bg-slate-900 border border-slate-700/80 text-indigo-300 disabled:opacity-40"
+                    title="Voice call"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                  </button>
+                )}
 
-              {settings.featuresEnabled.videoCalls && (
-                <button
-                  id="start-video-call-btn"
-                  type="button"
-                  onClick={() => onStartCall('video')}
-                  disabled={
-                    !!(
-                      timeStatus?.isExpired &&
-                      settings.restrictionsOnExpire.disableVideoCalls
-                    )
-                  }
-                  className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-700/80 text-pink-300 flex items-center justify-center shrink-0 disabled:opacity-40"
-                  title="Video call"
-                >
-                  <Video className="w-4 h-4" />
-                </button>
-              )}
+                {settings.featuresEnabled.videoCalls && (
+                  <button
+                    id="start-video-call-btn-mobile"
+                    type="button"
+                    onClick={() => onStartCall('video')}
+                    disabled={!!(timeStatus?.isExpired && settings.restrictionsOnExpire.disableVideoCalls)}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center bg-slate-900 border border-slate-700/80 text-pink-300 disabled:opacity-40"
+                    title="Video call"
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                  </button>
+                )}
 
-              <button
-                type="button"
-                onClick={() => setIsSearching((prev) => !prev)}
-                className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${
-                  isSearching
-                    ? 'bg-indigo-600 border-indigo-500 text-white'
-                    : 'bg-slate-900 border-slate-800 text-slate-400'
+                <button
+                  type="button"
+                  onClick={() => setIsSearching((prev) => !prev)}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center border ${
+                    isSearching
+                      ? 'bg-indigo-600 border-indigo-500 text-white'
+                      : 'bg-slate-900 border-slate-800 text-slate-400'
+                  }`}
+                  title="Search"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  id="open-profile-settings-btn-mobile"
+                  type="button"
+                  onClick={onOpenProfile}
+                  className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 flex items-center justify-center shrink-0"
+                  title="Profile settings"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  id="user-logout-btn-mobile"
+                  type="button"
+                  onClick={onLogout}
+                  className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 flex items-center justify-center shrink-0"
+                  title="Logout"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* =====================================================
+          DESKTOP CHROME - unchanged layout
+      ====================================================== */}
+      <div className="hidden md:block shrink-0 relative z-40">
+        <TimeBanner timeStatus={timeStatus} />
+
+        <header className="w-full px-4 sm:px-6 py-3 bg-slate-950/90 border-b border-slate-800/80 flex items-center justify-between backdrop-blur-xl">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative shrink-0">
+              <img
+                src={otherUser.pfpUrl || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200'}
+                alt={otherUser.name}
+                className="w-10 h-10 rounded-full object-cover border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
+              />
+              <span
+                className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-slate-950 ${
+                  otherPresence.isOnline
+                    ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
+                    : 'bg-slate-500'
                 }`}
-                title="Search"
-              >
-                <Search className="w-4 h-4" />
-              </button>
+              />
+            </div>
 
-              <button
-                id="open-profile-settings-btn"
-                type="button"
-                onClick={onOpenProfile}
-                className="hidden sm:flex w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 items-center justify-center shrink-0"
-                title="Profile settings"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <h2 className="truncate text-sm sm:text-base font-bold text-white font-cinzel tracking-anime-header text-shadow-anime-glow">
+                  {otherUser.nickname || otherUser.name}
+                </h2>
+                <div title={`Personal Mark: ${otherUser.logo.name}`} className="shrink-0">
+                  <LogoMark
+                    logo={otherUser.logo}
+                    size="sm"
+                    glow={false}
+                    className="opacity-70 hover:opacity-100"
+                  />
+                </div>
+              </div>
 
-              <button
-                id="user-logout-btn"
-                type="button"
-                onClick={onLogout}
-                className="hidden sm:flex w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 items-center justify-center shrink-0"
-                title="Logout"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+              <p className="text-[11px] font-sans-celestial flex items-center gap-1.5 tracking-wide">
+                {isOtherTyping ? (
+                  <span className="text-indigo-400 animate-pulse font-medium">typing...</span>
+                ) : otherPresence.isOnline ? (
+                  <span className="text-emerald-400">Online</span>
+                ) : (
+                  <span className="text-slate-400">{formatLastSeen(otherPresence.lastSeen)}</span>
+                )}
+              </p>
             </div>
           </div>
-        </header>
 
-        {/* Mobile search bar */}
-        {isSearching && (
-          <div className="w-full bg-slate-900 border-b border-slate-800 px-2.5 py-2 flex items-center gap-2">
-            <Search className="w-4 h-4 text-slate-400 shrink-0" />
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {timeStatus && (
+              <div className="relative z-50 shrink-0">
+                <TimeRemainingPill
+                  secondsLeft={timeStatus.remainingSeconds}
+                  isExpired={timeStatus.isExpired}
+                />
+              </div>
+            )}
 
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search messages..."
-              autoFocus
-              className="min-w-0 flex-1 bg-transparent text-[16px] text-white placeholder-slate-500 focus:outline-none"
-            />
-
-            {searchQuery && (
+            {settings.featuresEnabled.voiceCalls && (
               <button
+                id="start-voice-call-btn"
                 type="button"
-                onClick={() => setSearchQuery('')}
-                className="text-slate-400 text-xs shrink-0"
+                onClick={() => onStartCall('voice')}
+                disabled={!!(timeStatus?.isExpired && settings.restrictionsOnExpire.disableVoiceCalls)}
+                className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-indigo-300 border border-slate-700/80 hover:border-indigo-500/50 transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
+                title="Start encrypted voice call"
               >
-                Clear
+                <Phone className="w-4 h-4 text-indigo-400" />
+                <span>Call</span>
+              </button>
+            )}
+
+            {settings.featuresEnabled.videoCalls && (
+              <button
+                id="start-video-call-btn"
+                type="button"
+                onClick={() => onStartCall('video')}
+                disabled={!!(timeStatus?.isExpired && settings.restrictionsOnExpire.disableVideoCalls)}
+                className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-pink-300 border border-slate-700/80 hover:border-pink-500/50 transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
+                title="Start private video call"
+              >
+                <Video className="w-4 h-4 text-pink-400" />
+                <span>Video</span>
               </button>
             )}
 
             <button
               type="button"
-              onClick={() => setIsSearching(false)}
-              className="p-1 text-slate-400 shrink-0"
-              aria-label="Close search"
+              onClick={() => setIsSearching(!isSearching)}
+              className={`p-2 rounded-xl border transition-all ${
+                isSearching
+                  ? 'bg-indigo-600 border-indigo-500 text-white'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+              }`}
+              title="Search conversation"
             >
-              <X className="w-4 h-4" />
+              <Search className="w-4 h-4" />
             </button>
-          </div>
-        )}
-
-        {pinnedMessage && (
-          <div className="w-full bg-slate-950 border-b border-indigo-500/20 px-2.5 sm:px-4 py-2 flex items-center justify-between text-[10px] sm:text-xs text-indigo-200">
-            <div className="flex min-w-0 items-center gap-2 truncate">
-              <Pin className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
-              <span className="font-semibold text-slate-300 shrink-0">
-                Pinned:
-              </span>
-              <span className="truncate italic">
-                "{pinnedMessage.text}"
-              </span>
-            </div>
 
             <button
+              id="open-profile-settings-btn"
               type="button"
-              onClick={() => handlePin(pinnedMessage.id)}
-              className="text-[11px] text-slate-400 hover:text-white shrink-0 ml-2"
+              onClick={onOpenProfile}
+              className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+              title="Change your PFP & Profile"
             >
-              Unpin
+              <Settings className="w-4 h-4" />
+            </button>
+
+            <button
+              id="user-logout-btn"
+              type="button"
+              onClick={onLogout}
+              className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 hover:border-red-500/40 transition-colors"
+              title="Lock & Exit Sanctuary"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
-        )}
+        </header>
       </div>
 
-      {/* Main scroll area */}
-      <main
-        ref={messagesContainerRef}
-        className="absolute inset-x-0 top-0 bottom-0 overflow-y-auto overflow-x-hidden overscroll-contain px-2 sm:px-4 pt-[112px] sm:pt-[120px] pb-[92px] sm:pb-[102px]"
-        style={{
-          WebkitOverflowScrolling: 'touch',
-          scrollbarGutter: 'stable',
-        }}
-      >
-        {/* Small welcome card on mobile, normal on larger screens */}
-        <div className="w-full max-w-lg mx-auto mt-2 mb-4 sm:my-6 px-4 py-3 sm:p-6 rounded-2xl sm:rounded-3xl bg-slate-950/75 border border-slate-800/80 text-center shadow-xl">
-          <div className="flex items-center justify-center gap-2.5 sm:gap-4 mb-2 sm:mb-3">
-            <LogoMark
-              logo={currentUser.logo}
-              size="sm"
-              glow={true}
+      {/* Search Input Filter Bar */}
+      <AnimatePresence>
+        {isSearching && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="w-full bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex items-center gap-2 z-10"
+          >
+            <Search className="w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search private messages..."
+              autoFocus
+              className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
             />
-            <span className="text-indigo-400 text-xs">✦</span>
-            <LogoMark
-              logo={otherUser.logo}
-              size="sm"
-              glow={true}
-            />
-          </div>
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-white text-xs">
+                Clear
+              </button>
+            )}
+            <button onClick={() => setIsSearching(false)} className="text-slate-400 hover:text-white p-1">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          <h3 className="text-base sm:text-lg font-bold text-white font-cinzel tracking-anime-title mb-1">
+      {/* Pinned Message Bar */}
+      {pinnedMessage && (
+        <div className="w-full bg-slate-950/60 border-b border-indigo-500/20 px-4 py-2 flex items-center justify-between text-xs text-indigo-200 backdrop-blur-md z-10">
+          <div className="flex items-center gap-2 truncate">
+            <Pin className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
+            <span className="font-semibold text-slate-300">Pinned:</span>
+            <span className="truncate italic">"{pinnedMessage.text}"</span>
+          </div>
+          <button
+            onClick={() => handlePin(pinnedMessage.id)}
+            className="text-[11px] text-slate-400 hover:text-white shrink-0 ml-2"
+          >
+            Unpin
+          </button>
+        </div>
+      )}
+
+      {/* Chat Messages Flow Stage - this is the only scrolling region */}
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-2 sm:px-4 py-4 space-y-1"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        {/* Welcome Universe Card */}
+        <div className="w-full max-w-lg mx-auto my-6 p-6 rounded-3xl bg-slate-950/60 border border-slate-800/80 text-center shadow-xl backdrop-blur-md">
+          <div className="flex items-center justify-center gap-4 mb-3">
+            <LogoMark logo={currentUser.logo} size="sm" glow={true} />
+            <span className="text-indigo-400 text-xs">✦</span>
+            <LogoMark logo={otherUser.logo} size="sm" glow={true} />
+          </div>
+          <h3 className="text-lg font-bold text-white font-cinzel tracking-anime-title text-shadow-cinematic mb-1">
             {settings.worldTitle || 'SYNAX'}
           </h3>
-
-          <p className="text-[10px] sm:text-xs leading-relaxed text-slate-300/80 italic font-sans-celestial">
-            {settings.welcomeMessage ||
-              'Welcome to your private sanctuary. Every conversation belongs solely to you.'}
+          <p className="text-xs text-slate-300/80 italic font-sans-celestial tracking-wide">
+            {settings.welcomeMessage || 'Welcome to your private sanctuary. Every conversation belongs solely to you two.'}
           </p>
         </div>
 
+        {/* Render Chat Messages */}
         {filteredMessages.map((msg) => {
-          const sender =
-            msg.senderId === currentUser.id
-              ? currentUser
-              : otherUser;
-
+          const sender = msg.senderId === currentUser.id ? currentUser : otherUser;
           return (
             <MessageItem
               key={msg.id}
               message={msg}
               currentUserId={currentUser.id}
               senderName={sender.name}
-              senderPfp={
-                sender.pfpUrl ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
-              }
+              senderPfp={sender.pfpUrl}
               onReact={handleReact}
               onReply={(m) => setReplyingTo(m)}
               onPin={handlePin}
@@ -531,33 +630,35 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
           );
         })}
 
+        {/* Typing indicator bubble */}
         {isOtherTyping && (
-          <div className="flex items-center gap-2 px-2.5 sm:px-4 py-2 text-xs text-slate-400">
-            <div className="w-6 h-6 rounded-full overflow-hidden shrink-0">
-              <img
-                src={
-                  otherUser.pfpUrl ||
-                  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100'
-                }
-                alt={otherUser.name}
-                className="block w-full h-full object-cover"
-              />
-            </div>
-
+          <motion.div
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 px-4 py-2 text-xs text-slate-400"
+          >
+            <img
+              src={
+                otherUser.pfpUrl ||
+                'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100'
+              }
+              alt={otherUser.name}
+              className="w-6 h-6 rounded-full object-cover"
+            />
             <div className="flex gap-1 items-center px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" />
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:0.2s]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:0.4s]" />
             </div>
-          </div>
+          </motion.div>
         )}
 
-        <div ref={messagesEndRef} className="h-px" />
-      </main>
+        <div ref={messagesEndRef} />
+      </div>
 
-      {/* Composer is outside the scroll area and always stays at the bottom */}
+      {/* Message Composer at Bottom */}
       <div
-        className="absolute inset-x-0 bottom-0 z-50"
+        className="fixed md:static left-0 right-0 bottom-0 z-50 md:z-auto w-full md:shrink-0"
         style={{
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
@@ -573,28 +674,30 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
         />
       </div>
 
-      {/* Lightbox */}
-      {lightboxImage && (
-        <div
-          onClick={() => setLightboxImage(null)}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90"
-        >
-          <img
-            src={lightboxImage}
-            alt="Preview"
-            className="max-w-full max-h-[90vh] object-contain rounded-2xl"
-          />
-
-          <button
-            type="button"
+      {/* Image Lightbox Modal */}
+      <AnimatePresence>
+        {lightboxImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             onClick={() => setLightboxImage(null)}
-            className="absolute top-6 right-6 p-2 rounded-full bg-slate-900/90 text-white"
-            aria-label="Close preview"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
           >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-      )}
+            <img
+              src={lightboxImage}
+              alt="Preview"
+              className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+            />
+            <button
+              onClick={() => setLightboxImage(null)}
+              className="absolute top-6 right-6 p-2 rounded-full bg-slate-900/80 text-white"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
