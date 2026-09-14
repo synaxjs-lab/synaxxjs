@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   Smile,
   Paperclip,
@@ -229,7 +228,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   // Locked or expired state
   if (isMessagingDisabled) {
     return (
-      <div className="w-full p-4 bg-slate-950/80 border-t border-slate-800/80 flex items-center justify-center text-slate-400 text-sm font-medium gap-2">
+      <div className="w-full px-3 py-2.5 bg-slate-950 border-t border-slate-800/80 flex items-center justify-center text-slate-400 text-sm font-medium gap-2">
         <Lock className="w-4 h-4 text-red-400" />
         <span>🔒 Messaging is currently disabled.</span>
       </div>
@@ -237,7 +236,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   }
 
   return (
-    <div className="relative w-full bg-slate-950/80 border-t border-slate-800/80 px-3 sm:px-6 py-3 backdrop-blur-xl">
+    <div className="relative w-full bg-slate-950 border-t border-slate-800/80 px-2 sm:px-6 py-2.5 sm:py-3">
       {/* Reply Banner */}
       {replyingTo && (
         <div className="mb-2 p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between text-xs">
@@ -256,32 +255,25 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       )}
 
       {/* Emoji Picker Popover */}
-      <AnimatePresence>
-        {showEmojiPicker && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute bottom-full left-4 mb-2 p-3 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl z-30 max-w-xs"
-          >
-            <div className="grid grid-cols-5 gap-2 text-xl">
-              {COMMON_EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => {
-                    setText((prev) => prev + emoji);
-                    setShowEmojiPicker(false);
-                  }}
-                  className="p-1.5 hover:bg-slate-800 rounded-xl transition-transform hover:scale-125"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {showEmojiPicker && (
+        <div className="absolute bottom-full left-2 sm:left-4 mb-2 p-2.5 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl z-30 w-[calc(100vw-1rem)] max-w-[320px]">
+          <div className="grid grid-cols-5 gap-1.5 sm:gap-2 text-xl">
+            {COMMON_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => {
+                  setText((prev) => prev + emoji);
+                  setShowEmojiPicker(false);
+                }}
+                className="min-w-0 p-1.5 hover:bg-slate-800 rounded-xl active:scale-95"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Voice Recording / Preview Mode */}
       {isRecording ? (
