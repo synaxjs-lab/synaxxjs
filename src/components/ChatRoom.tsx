@@ -17,7 +17,6 @@ import {
   Settings,
   LogOut,
   X,
-  ChevronDown,
 } from 'lucide-react';
 import { ApiService } from '../services/api';
 import { socketService } from '../services/socket';
@@ -59,26 +58,6 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const lastScrollTopRef = useRef(0);
-  const previousMessageCountRef = useRef(messages.length);
-  const [newMessageCount, setNewMessageCount] = useState(0);
-
-  const isNearBottom = () => {
-    const container = messagesContainerRef.current;
-    if (!container) return true;
-
-    const distanceFromBottom =
-      container.scrollHeight -
-      container.scrollTop -
-      container.clientHeight;
-
-    return distanceFromBottom < 160;
-  };
-
-  const handleMessagesScroll = () => {
-    if (isNearBottom()) {
-      setNewMessageCount(0);
-    }
-  };
 
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({
@@ -87,48 +66,35 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
     });
   };
 
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     scrollToBottom('auto');
   }, []);
 
-  // New content follows the user only when they are already near the bottom.
-  // When they are reading older messages, we keep their position and show a small
-  // "New message" button instead.
+  // New messages only pull the view down when the user is already near the bottom.
   useEffect(() => {
-    const count = messages.length;
-    const previousCount = previousMessageCountRef.current;
+    const container = messagesContainerRef.current;
+    if (!container) return;
 
-    if (count === previousCount) return;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
 
-    previousMessageCountRef.current = count;
-
-    if (isNearBottom()) {
-      setNewMessageCount(0);
+    if (distanceFromBottom < 160) {
       scrollToBottom('smooth');
     }
-  }, [messages.length]);
-
-  useEffect(() => {
-    if (isNearBottom()) {
-      scrollToBottom('smooth');
-    }
-  }, [isOtherTyping]);
+  }, [messages.length, isOtherTyping]);
 
   // Real-time WebSocket Listeners
   useEffect(() => {
     const unsubMsg = socketService.on('chat:new_message', (data) => {
       if (data.message) {
-        const wasNearBottom = isNearBottom();
-
         setMessages((prev) => {
           // Guard against duplicates
           if (prev.some((m) => m.id === data.message.id)) return prev;
           return [...prev, data.message];
         });
-
-        if (!wasNearBottom) {
-          setNewMessageCount((prev) => prev + 1);
-        }
 
         if (data.message.senderId === otherUser.id) {
           SoundEffects.playReceived();
@@ -306,13 +272,22 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <div className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden border-2 border-indigo-500/50 shrink-0">
                 <img
-                  src={
-                    otherUser.pfpUrl ||
-                    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200'
-                  }
+                  src={otherUser.pfpUrl || ''}
                   alt={otherUser.name}
                   className="block w-full h-full object-cover object-center"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
                 />
+                <div
+                  className="absolute inset-0 items-center justify-center bg-slate-900 text-indigo-200 font-semibold text-sm"
+                  style={{ display: otherUser.pfpUrl ? 'none' : 'flex' }}
+                  aria-hidden="true"
+                >
+                  {(otherUser.nickname || otherUser.name || '?').charAt(0).toUpperCase()}
+                </div>
                 <span
                   className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-slate-950 ${
                     otherPresence.isOnline
@@ -353,9 +328,9 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
             </div>
 
             {/* Controls: compact enough to stay visible on narrow phones */}
-            <div className="shrink-0 flex items-center gap-1">
+            <div className="shrink-0 flex items-center gap-1 md:gap-0">
               {timeStatus && (
-                <div className="shrink-0 min-w-[72px] sm:min-w-[82px]">
+                <div className="shrink-0 min-w-[72px] sm:min-w-[82px] md:hidden">
                   <TimeRemainingPill
                     secondsLeft={timeStatus.remainingSeconds}
                     isExpired={timeStatus.isExpired}
@@ -402,7 +377,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
               <button
                 type="button"
                 onClick={() => setIsSearching((prev) => !prev)}
-                className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${
+                className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 md:hidden ${
                   isSearching
                     ? 'bg-indigo-600 border-indigo-500 text-white'
                     : 'bg-slate-900 border-slate-800 text-slate-400'
@@ -412,28 +387,19 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                 <Search className="w-4 h-4" />
               </button>
 
-              {/* Logout is intentionally visible on mobile */}
+              {/* Mobile logout only. It is hidden on desktop to avoid duplicate controls. */}
               <button
                 id="user-logout-btn-mobile"
                 type="button"
                 onClick={onLogout}
-                className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 flex items-center justify-center shrink-0 hover:text-red-400"
+                className="md:hidden w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 flex items-center justify-center shrink-0 hover:text-red-400"
                 title="Logout"
+                aria-label="Logout"
               >
                 <LogOut className="w-4 h-4" />
               </button>
 
-              <button
-                id="open-profile-settings-btn-mobile"
-                type="button"
-                onClick={onOpenProfile}
-                className="hidden sm:flex w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 items-center justify-center shrink-0"
-                title="Profile settings"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-
-              {/* Desktop text buttons remain available below md */}
+              {/* Desktop controls are shown only at md+ so they cannot duplicate the compact controls. */}
               <div className="hidden md:flex items-center gap-2 ml-1">
                 <button
                   id="start-voice-call-btn"
@@ -520,11 +486,9 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
       {/* Only this area scrolls */}
       <main
         ref={messagesContainerRef}
-        onScroll={handleMessagesScroll}
         className="absolute inset-0 overflow-y-auto overflow-x-hidden overscroll-contain px-2 sm:px-4 pt-[66px] md:pt-[122px] pb-[108px] md:pb-[92px]"
         style={{
           WebkitOverflowScrolling: 'touch',
-          scrollBehavior: 'auto',
         }}
       >
         {pinnedMessage && (
@@ -612,27 +576,6 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
           <div ref={messagesEndRef} className="h-px" />
         </div>
       </main>
-
-      {/* New message indicator: only appears while the user is reading older messages. */}
-      {newMessageCount > 0 && (
-        <button
-          type="button"
-          onClick={() => {
-            setNewMessageCount(0);
-            scrollToBottom('smooth');
-          }}
-          className="fixed right-3 sm:right-6 z-[60] h-9 sm:h-10 px-3 sm:px-4 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-lg border border-indigo-400/40 flex items-center gap-1.5 active:scale-95"
-          style={{
-            bottom: 'calc(88px + env(safe-area-inset-bottom))',
-          }}
-          aria-label={`Jump to ${newMessageCount} new message${newMessageCount === 1 ? '' : 's'}`}
-        >
-          <span>
-            {newMessageCount} new message{newMessageCount === 1 ? '' : 's'}
-          </span>
-          <ChevronDown className="w-4 h-4" />
-        </button>
-      )}
 
       {/* Fixed composer. Safe-area is filled with the same dark background, so no strip shows. */}
       <div
