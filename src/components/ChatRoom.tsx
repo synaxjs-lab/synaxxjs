@@ -214,8 +214,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
       setReplyingTo(null);
       SoundEffects.playSent();
 
-      // Keep a newly-sent message visible immediately when the user was already
-      // chatting at the bottom of the conversation.
+      // Put a newly-sent message at the latest position immediately.
       requestAnimationFrame(() => {
         const el = messagesContainerRef.current;
         if (el) el.scrollTop = el.scrollHeight;
@@ -286,19 +285,13 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                   className="block w-full h-full object-cover object-center"
                   onError={(e) => {
                     const img = e.currentTarget;
-                    if (img.dataset.retried !== '1' && otherUser.pfpUrl) {
-                      img.dataset.retried = '1';
-                      img.src = `${otherUser.pfpUrl}${otherUser.pfpUrl.includes('?') ? '&' : '?'}v=1`;
-                      return;
-                    }
                     img.style.display = 'none';
                     const fallback = img.nextElementSibling as HTMLElement | null;
                     if (fallback) fallback.style.display = 'flex';
                   }}
                 />
                 <div
-                  className="absolute inset-0 items-center justify-center bg-slate-900 text-indigo-200 font-semibold text-sm"
-                  style={{ display: otherUser.pfpUrl ? 'none' : 'flex' }}
+                  className="absolute inset-0 hidden items-center justify-center bg-slate-900 text-indigo-200 font-semibold text-sm"
                   aria-hidden="true"
                 >
                   {(otherUser.nickname || otherUser.name || '?').charAt(0).toUpperCase()}
@@ -364,7 +357,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                       settings.restrictionsOnExpire.disableVoiceCalls
                     )
                   }
-                  className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-700/80 text-indigo-300 flex items-center justify-center shrink-0 disabled:opacity-40"
+                  className="md:hidden w-9 h-9 rounded-xl bg-slate-900 border border-slate-700/80 text-indigo-300 flex items-center justify-center shrink-0 disabled:opacity-40"
                   title="Voice call"
                 >
                   <Phone className="w-4 h-4" />
@@ -382,7 +375,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                       settings.restrictionsOnExpire.disableVideoCalls
                     )
                   }
-                  className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-700/80 text-pink-300 flex items-center justify-center shrink-0 disabled:opacity-40"
+                  className="md:hidden w-9 h-9 rounded-xl bg-slate-900 border border-slate-700/80 text-pink-300 flex items-center justify-center shrink-0 disabled:opacity-40"
                   title="Video call"
                 >
                   <Video className="w-4 h-4" />
