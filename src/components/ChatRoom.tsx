@@ -66,8 +66,6 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
     });
   };
 
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     scrollToBottom('auto');
