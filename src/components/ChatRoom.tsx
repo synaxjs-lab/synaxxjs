@@ -54,6 +54,8 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
+  const [displayedTimeStatus, setDisplayedTimeStatus] = useState<TimeStatus | null>(timeStatus);
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -66,6 +68,40 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
     });
   };
 
+
+  // Keep a live 1-second countdown between authoritative server ticks.
+  // Server timestamps remain the source of truth; this only makes the UI smooth.
+  useEffect(() => {
+    setDisplayedTimeStatus(timeStatus);
+  }, [timeStatus]);
+
+  useEffect(() => {
+    if (!timeStatus) return;
+
+    const interval = window.setInterval(() => {
+      setDisplayedTimeStatus((previous) => {
+        if (!previous || previous.isExpired) return previous;
+
+        const elapsedSinceServerTick = Math.max(
+          0,
+          Math.floor((Date.now() - previous.serverTimestamp) / 1000)
+        );
+
+        const nextRemaining = Math.max(
+          0,
+          previous.remainingSeconds - elapsedSinceServerTick
+        );
+
+        return {
+          ...previous,
+          remainingSeconds: nextRemaining,
+          isExpired: nextRemaining <= 0,
+        };
+      });
+    }, 250);
+
+    return () => window.clearInterval(interval);
+  }, [timeStatus]);
 
   useEffect(() => {
     scrollToBottom('auto');
@@ -268,11 +304,12 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
       className="fixed inset-0 z-10 w-full h-[100dvh] overflow-hidden bg-[#04060c] text-slate-100 select-none"
     >
       {/* Server timer visibility is controlled by Admin. */}
-      {(settings as AppSettings & { showTimerToUsers?: boolean }).showTimerToUsers !== false && (
-        <div className="hidden md:block shrink-0">
-          <TimeBanner timeStatus={timeStatus} />
-        </div>
-      )}
+      {(settings as AppSettings & { showTimerToUsers?: boolean }).showTimerToUsers !== false &&
+        displayedTimeStatus && (
+          <div className="hidden md:block shrink-0">
+            <TimeBanner timeStatus={displayedTimeStatus} />
+          </div>
+        )}
 
       {/* Fixed header. It does not animate or move while scrolling. */}
       <header className="absolute inset-x-0 top-0 z-40 w-full bg-slate-950 border-b border-slate-800/80">
@@ -339,14 +376,15 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
 
             {/* Controls: compact enough to stay visible on narrow phones */}
             <div className="shrink-0 flex items-center gap-1 md:gap-0">
-              {(settings as AppSettings & { showTimerToUsers?: boolean }).showTimerToUsers !== false && timeStatus && (
-                <div className="shrink-0 min-w-[72px] sm:min-w-[82px] md:hidden">
-                  <TimeRemainingPill
-                    secondsLeft={timeStatus.remainingSeconds}
-                    isExpired={timeStatus.isExpired}
-                  />
-                </div>
-              )}
+              {(settings as AppSettings & { showTimerToUsers?: boolean }).showTimerToUsers !== false &&
+                displayedTimeStatus && (
+                  <div className="shrink-0 min-w-[72px] sm:min-w-[82px] md:hidden">
+                    <TimeRemainingPill
+                      secondsLeft={displayedTimeStatus.remainingSeconds}
+                      isExpired={displayedTimeStatus.isExpired}
+                    />
+                  </div>
+                )}
 
               {settings.featuresEnabled.voiceCalls && (
                 <button
