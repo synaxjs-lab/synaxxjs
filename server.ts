@@ -717,6 +717,16 @@ async function startServer() {
               userId: session.userId,
               presence: getPresence()
             }));
+
+            // Immediately send the current authoritative countdown so both
+            // desktop and mobile clients display it as soon as the socket connects.
+            if (session.userId === 'person_1' || session.userId === 'person_2') {
+              ws.send(JSON.stringify({
+                type: 'time:tick',
+                userId: session.userId,
+                timeStatus: calculateTimeRemaining(session.userId)
+              }));
+            }
           }
           return;
         }
