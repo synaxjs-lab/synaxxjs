@@ -49,6 +49,15 @@ export default function App() {
           try {
             const meRes = await ApiService.getMe();
             setCurrentUser(meRes.user);
+
+            if (meRes.user.id === 'person_1') {
+              setPerson1(meRes.user);
+              if (meRes.otherUser) setPerson2(meRes.otherUser);
+            } else {
+              setPerson2(meRes.user);
+              if (meRes.otherUser) setPerson1(meRes.otherUser);
+            }
+
             setSettings(meRes.settings);
             setTimeStatus(meRes.timeStatus);
 
@@ -168,6 +177,18 @@ export default function App() {
     if (!selectedUserId) return;
     const loginRes = await ApiService.login(selectedUserId, password);
     setCurrentUser(loginRes.user);
+
+    // The authenticated response contains the complete other-user profile,
+    // including the PFP. Keep the shared profile state in sync so ChatRoom
+    // never falls back to the placeholder/logo.
+    if (loginRes.user.id === 'person_1') {
+      setPerson1(loginRes.user);
+      if (loginRes.otherUser) setPerson2(loginRes.otherUser);
+    } else {
+      setPerson2(loginRes.user);
+      if (loginRes.otherUser) setPerson1(loginRes.otherUser);
+    }
+
     setSettings(loginRes.settings);
     setTimeStatus(loginRes.timeStatus);
 
