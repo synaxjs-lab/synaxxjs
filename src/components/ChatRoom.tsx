@@ -71,7 +71,8 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
     scrollToBottom('auto');
   }, []);
 
-  // New messages only pull the view down when the user is already near the bottom.
+  // Follow the latest message only when the user is already at the bottom.
+  // Use an instant scroll so mobile never gets the laggy animation.
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
@@ -79,8 +80,11 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
 
-    if (distanceFromBottom < 160) {
-      scrollToBottom('smooth');
+    if (distanceFromBottom < 180) {
+      requestAnimationFrame(() => {
+        const el = messagesContainerRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
     }
   }, [messages.length, isOtherTyping]);
 
@@ -209,6 +213,13 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
       });
       setReplyingTo(null);
       SoundEffects.playSent();
+
+      // Keep a newly-sent message visible immediately when the user was already
+      // chatting at the bottom of the conversation.
+      requestAnimationFrame(() => {
+        const el = messagesContainerRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
     } catch (err: any) {
       console.error('Failed to send message:', err);
     }
@@ -274,8 +285,14 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                   alt={otherUser.name}
                   className="block w-full h-full object-cover object-center"
                   onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                    const img = e.currentTarget;
+                    if (img.dataset.retried !== '1' && otherUser.pfpUrl) {
+                      img.dataset.retried = '1';
+                      img.src = `${otherUser.pfpUrl}${otherUser.pfpUrl.includes('?') ? '&' : '?'}v=1`;
+                      return;
+                    }
+                    img.style.display = 'none';
+                    const fallback = img.nextElementSibling as HTMLElement | null;
                     if (fallback) fallback.style.display = 'flex';
                   }}
                 />
@@ -372,17 +389,16 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                 </button>
               )}
 
+              {/* Mobile profile settings replaces search for easier access on phones. */}
               <button
+                id="open-profile-settings-btn-mobile"
                 type="button"
-                onClick={() => setIsSearching((prev) => !prev)}
-                className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 md:hidden ${
-                  isSearching
-                    ? 'bg-indigo-600 border-indigo-500 text-white'
-                    : 'bg-slate-900 border-slate-800 text-slate-400'
-                }`}
-                title="Search"
+                onClick={onOpenProfile}
+                className="md:hidden w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 flex items-center justify-center shrink-0"
+                title="Profile settings"
+                aria-label="Profile settings"
               >
-                <Search className="w-4 h-4" />
+                <Settings className="w-4 h-4" />
               </button>
 
               {/* Mobile logout only. It is hidden on desktop to avoid duplicate controls. */}
