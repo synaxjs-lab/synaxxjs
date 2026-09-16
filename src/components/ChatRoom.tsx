@@ -267,10 +267,12 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
       id="synax-chat-room"
       className="fixed inset-0 z-10 w-full h-[100dvh] overflow-hidden bg-[#04060c] text-slate-100 select-none"
     >
-      {/* Desktop-only server banner. Mobile uses the compact timer in the header. */}
-      <div className="hidden md:block shrink-0">
-        <TimeBanner timeStatus={timeStatus} />
-      </div>
+      {/* Server timer visibility is controlled by Admin. */}
+      {(settings as AppSettings & { showTimerToUsers?: boolean }).showTimerToUsers !== false && (
+        <div className="hidden md:block shrink-0">
+          <TimeBanner timeStatus={timeStatus} />
+        </div>
+      )}
 
       {/* Fixed header. It does not animate or move while scrolling. */}
       <header className="absolute inset-x-0 top-0 z-40 w-full bg-slate-950 border-b border-slate-800/80">
@@ -337,7 +339,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
 
             {/* Controls: compact enough to stay visible on narrow phones */}
             <div className="shrink-0 flex items-center gap-1 md:gap-0">
-              {timeStatus && (
+              {(settings as AppSettings & { showTimerToUsers?: boolean }).showTimerToUsers !== false && timeStatus && (
                 <div className="shrink-0 min-w-[72px] sm:min-w-[82px] md:hidden">
                   <TimeRemainingPill
                     secondsLeft={timeStatus.remainingSeconds}
