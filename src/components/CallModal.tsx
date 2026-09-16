@@ -40,8 +40,11 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
   const [connectionMessage, setConnectionMessage] = useState<string>('Initializing WebRTC...');
   const [hasError, setHasError] = useState<string | null>(null);
 
-  const displayOtherUserName = callState.otherUserName?.trim() || 'Unknown Caller';
-  const displayOtherUserPfp = callState.otherUserPfp?.trim() || '';
+  const displayOtherUserName =
+    callState.otherUserName?.trim() || 'Unknown Caller';
+
+  const displayOtherUserPfp =
+    callState.otherUserPfp?.trim() || '';
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -302,31 +305,12 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
       <div className="relative w-full max-w-4xl h-[85vh] max-h-[720px] rounded-3xl bg-slate-950 border border-slate-800 flex flex-col overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.9)]">
         {/* Top Header Bar */}
         <div className="absolute top-0 inset-x-0 z-30 p-4 sm:p-6 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
-          <div className="flex items-center gap-3">
-            {displayOtherUserPfp ? (
-              <img
-                src={displayOtherUserPfp}
-                alt={displayOtherUserName}
-                className="w-10 h-10 rounded-full object-cover border border-indigo-500/50"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
-                  if (fallback) fallback.style.display = 'flex';
-                }}
-              />
-            ) : null}
-            <div
-              className="w-10 h-10 rounded-full border border-indigo-500/50 bg-slate-900 items-center justify-center text-indigo-200 font-semibold"
-              style={{ display: displayOtherUserPfp ? 'none' : 'flex' }}
-              aria-hidden="true"
-            >
-              {displayOtherUserName.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-white font-cinzel tracking-wider">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-white font-cinzel tracking-wider truncate">
                 {displayOtherUserName}
               </h3>
-              <p className="text-[11px] text-slate-400 font-mono">
+              <p className="text-[11px] text-slate-400 font-mono truncate">
                 {status === 'connected' ? `Duration: ${formatDuration(callDuration)}` : connectionMessage}
               </p>
             </div>
@@ -370,8 +354,7 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
                       }}
                     />
                     <div
-                      className="w-24 h-24 rounded-full border-2 border-indigo-500 bg-slate-900 items-center justify-center text-2xl font-semibold text-indigo-200"
-                      style={{ display: displayOtherUserPfp ? 'none' : 'flex' }}
+                      className="hidden w-24 h-24 rounded-full border-2 border-indigo-500 bg-slate-900 items-center justify-center text-2xl font-semibold text-indigo-200"
                     >
                       {displayOtherUserName.charAt(0).toUpperCase()}
                     </div>
@@ -414,8 +397,7 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
                   }}
                 />
                 <div
-                  className="w-32 h-32 rounded-full border-4 border-indigo-500/60 bg-slate-900 items-center justify-center text-4xl font-semibold text-indigo-200"
-                  style={{ display: displayOtherUserPfp ? 'none' : 'flex' }}
+                  className="hidden w-32 h-32 rounded-full border-4 border-indigo-500/60 bg-slate-900 items-center justify-center text-4xl font-semibold text-indigo-200"
                 >
                   {displayOtherUserName.charAt(0).toUpperCase()}
                 </div>
