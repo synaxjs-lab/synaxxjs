@@ -173,6 +173,7 @@ function getInitialDb(): DbSchema {
       timeOverMessage: 'Your private-world time has ended for now. See you again soon ✨',
       timeStrategy: 'continuous',
       warningMinutes: [10, 5, 1],
+      showTimerToUsers: true,
       restrictionsOnExpire: {
         disableMessaging: true,
         disableVoiceCalls: true,
@@ -779,8 +780,31 @@ async function startServer() {
               return;
             }
 
-            // If offer, broadcast both 'call:incoming' and 'call:offer' for 100% recipient compatibility
+            // Record one chat-history entry for each newly initiated call.
+            // This is intentionally inside the offer branch so the duplicated
+            // signaling compatibility broadcasts do not create duplicate history entries.
             if (data.type === 'call:offer') {
+              const caller = db.users[clientInfo.userId] as any;
+              const target = db.users[targetId] as any;
+              const callKind = data.callType === 'video' ? 'video' : 'voice';
+
+              const callHistoryMessage = {
+                id: `msg_call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                senderId: 'system',
+                type: 'system',
+                text: `📞 ${caller.name} started a ${callKind} call with ${target.name}.`,
+                timestamp: Date.now(),
+                status: 'read',
+                reactions: {}
+              };
+
+              db.messages.push(callHistoryMessage);
+              saveDbSync();
+              broadcast({
+                type: 'chat:new_message',
+                message: callHistoryMessage
+              });
+
               broadcast({
                 ...data,
                 type: 'call:incoming',
@@ -796,7 +820,7 @@ async function startServer() {
                 targetId
               }, (c) => c.userId === targetId);
 
-              addLog(clientInfo.userId, `Initiated ${data.callType || 'voice'} call`, `To ${targetId}`);
+              addLog(clientInfo.userId, `Initiated ${callKind} call`, `To ${targetId}`);
             } else {
               // Forward other signaling (answer, ice-candidate, reject, end) strictly to the other person
               broadcast({
