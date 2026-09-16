@@ -40,6 +40,12 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
   const [connectionMessage, setConnectionMessage] = useState<string>('Initializing WebRTC...');
   const [hasError, setHasError] = useState<string | null>(null);
 
+  const displayOtherUserName =
+    callState.otherUserName?.trim() || 'Unknown Caller';
+
+  const displayOtherUserPfp =
+    callState.otherUserPfp?.trim() || '';
+
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -300,14 +306,20 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
         {/* Top Header Bar */}
         <div className="absolute top-0 inset-x-0 z-30 p-4 sm:p-6 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
           <div className="flex items-center gap-3">
-            <img
-              src={callState.otherUserPfp}
-              alt={callState.otherUserName}
-              className="w-10 h-10 rounded-full object-cover border border-indigo-500/50"
-            />
+            {displayOtherUserPfp ? (
+              <img
+                src={displayOtherUserPfp}
+                alt={displayOtherUserName}
+                className="w-10 h-10 rounded-full object-cover border border-indigo-500/50"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full border border-indigo-500/50 bg-slate-900 flex items-center justify-center text-indigo-200 font-semibold">
+                {displayOtherUserName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div>
               <h3 className="text-sm font-bold text-white font-cinzel tracking-wider">
-                {callState.otherUserName}
+                {displayOtherUserName}
               </h3>
               <p className="text-[11px] text-slate-400 font-mono">
                 {status === 'connected' ? `Duration: ${formatDuration(callDuration)}` : connectionMessage}
@@ -344,7 +356,7 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
                   <div className="relative">
                     <img
                       src={callState.otherUserPfp}
-                      alt={callState.otherUserName}
+                      alt={displayOtherUserName}
                       className="w-24 h-24 rounded-full object-cover border-2 border-indigo-500 shadow-[0_0_40px_rgba(99,102,241,0.5)]"
                     />
                     <div className="absolute -inset-2 rounded-full border border-indigo-500/40 animate-ping" />
@@ -377,19 +389,15 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
               <div className="relative">
                 <img
                   src={callState.otherUserPfp}
-                  alt={callState.otherUserName}
+                  alt={displayOtherUserName}
                   className="w-32 h-32 rounded-full object-cover border-4 border-indigo-500/60 shadow-[0_0_60px_rgba(99,102,241,0.4)]"
                 />
-                <motion.div
-                  animate={{ scale: [1, 1.25, 1], opacity: [0.3, 0.7, 0.3] }}
-                  transition={{ duration: 2.5, repeat: Infinity }}
-                  className="absolute -inset-4 rounded-full border border-indigo-400/50 pointer-events-none"
-                />
+                <div className="absolute -inset-4 rounded-full border border-indigo-400/25 pointer-events-none" />
               </div>
 
               <div>
                 <h2 className="text-2xl font-bold text-white font-cinzel tracking-widest">
-                  {callState.otherUserName}
+                  {displayOtherUserName}
                 </h2>
                 <p className="text-xs uppercase tracking-[0.25em] text-indigo-400 font-mono mt-1">
                   Private Voice Frequency
@@ -429,7 +437,10 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
                 className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-[0_0_25px_rgba(16,185,129,0.5)] transition-all active:scale-95"
               >
                 <Phone className="w-5 h-5" />
-                <span>Accept Sanctuary Call</span>
+                <span>
+                  Accept {displayOtherUserName}'s{' '}
+                  {callState.callType === 'video' ? 'Video Call' : 'Call'}
+                </span>
               </button>
             </div>
           ) : (
