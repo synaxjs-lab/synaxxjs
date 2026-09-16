@@ -40,11 +40,8 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
   const [connectionMessage, setConnectionMessage] = useState<string>('Initializing WebRTC...');
   const [hasError, setHasError] = useState<string | null>(null);
 
-  const displayOtherUserName =
-    callState.otherUserName?.trim() || 'Unknown Caller';
-
-  const displayOtherUserPfp =
-    callState.otherUserPfp?.trim() || '';
+  const displayOtherUserName = callState.otherUserName?.trim() || 'Unknown Caller';
+  const displayOtherUserPfp = callState.otherUserPfp?.trim() || '';
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -311,12 +308,20 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
                 src={displayOtherUserPfp}
                 alt={displayOtherUserName}
                 className="w-10 h-10 rounded-full object-cover border border-indigo-500/50"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                  if (fallback) fallback.style.display = 'flex';
+                }}
               />
-            ) : (
-              <div className="w-10 h-10 rounded-full border border-indigo-500/50 bg-slate-900 flex items-center justify-center text-indigo-200 font-semibold">
-                {displayOtherUserName.charAt(0).toUpperCase()}
-              </div>
-            )}
+            ) : null}
+            <div
+              className="w-10 h-10 rounded-full border border-indigo-500/50 bg-slate-900 items-center justify-center text-indigo-200 font-semibold"
+              style={{ display: displayOtherUserPfp ? 'none' : 'flex' }}
+              aria-hidden="true"
+            >
+              {displayOtherUserName.charAt(0).toUpperCase()}
+            </div>
             <div>
               <h3 className="text-sm font-bold text-white font-cinzel tracking-wider">
                 {displayOtherUserName}
@@ -355,10 +360,21 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 gap-4">
                   <div className="relative">
                     <img
-                      src={callState.otherUserPfp}
+                      src={displayOtherUserPfp}
                       alt={displayOtherUserName}
                       className="w-24 h-24 rounded-full object-cover border-2 border-indigo-500 shadow-[0_0_40px_rgba(99,102,241,0.5)]"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
                     />
+                    <div
+                      className="w-24 h-24 rounded-full border-2 border-indigo-500 bg-slate-900 items-center justify-center text-2xl font-semibold text-indigo-200"
+                      style={{ display: displayOtherUserPfp ? 'none' : 'flex' }}
+                    >
+                      {displayOtherUserName.charAt(0).toUpperCase()}
+                    </div>
                     <div className="absolute -inset-2 rounded-full border border-indigo-500/40 animate-ping" />
                   </div>
                   <p className="text-sm text-slate-300 font-cinzel tracking-wider">
@@ -388,11 +404,26 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
             <div className="flex flex-col items-center justify-center gap-6 text-center z-10 px-4">
               <div className="relative">
                 <img
-                  src={callState.otherUserPfp}
+                  src={displayOtherUserPfp}
                   alt={displayOtherUserName}
                   className="w-32 h-32 rounded-full object-cover border-4 border-indigo-500/60 shadow-[0_0_60px_rgba(99,102,241,0.4)]"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
                 />
-                <div className="absolute -inset-4 rounded-full border border-indigo-400/25 pointer-events-none" />
+                <div
+                  className="w-32 h-32 rounded-full border-4 border-indigo-500/60 bg-slate-900 items-center justify-center text-4xl font-semibold text-indigo-200"
+                  style={{ display: displayOtherUserPfp ? 'none' : 'flex' }}
+                >
+                  {displayOtherUserName.charAt(0).toUpperCase()}
+                </div>
+                <motion.div
+                  animate={{ scale: [1, 1.25, 1], opacity: [0.3, 0.7, 0.3] }}
+                  transition={{ duration: 2.5, repeat: Infinity }}
+                  className="absolute -inset-4 rounded-full border border-indigo-400/50 pointer-events-none"
+                />
               </div>
 
               <div>
