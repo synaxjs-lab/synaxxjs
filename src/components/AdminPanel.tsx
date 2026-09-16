@@ -453,7 +453,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
                   {timeStatus ? `${Math.floor(timeStatus.remainingSeconds / 60)}m ${timeStatus.remainingSeconds % 60}s` : '--'}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Limit: {users[0]?.allowedMinutes ?? 60}m / {settings.timeStrategy}
+                  Limit: {users[0]?.allowedMinutes ?? 60}m / {settings.timeStrategy} • Timer {(settings as AppSettings & { showTimerToUsers?: boolean }).showTimerToUsers !== false ? 'Visible' : 'Hidden'}
                 </p>
               </div>
 
@@ -917,6 +917,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
                       Active Usage (Pauses When Offline)
                     </option>
                   </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs uppercase text-slate-400 font-medium">
+                    Timer Visibility
+                  </label>
+                  <label className="flex items-center justify-between gap-3 w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer">
+                    <span className="text-sm text-white">
+                      Show countdown to users
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={(settings as AppSettings & { showTimerToUsers?: boolean }).showTimerToUsers !== false}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          showTimerToUsers: e.target.checked,
+                        })
+                      }
+                      className="w-5 h-5 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                    />
+                  </label>
+                  <p className="text-[10px] text-slate-500">
+                    Turn this off to hide the timer from both users while keeping the server limit active.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">
