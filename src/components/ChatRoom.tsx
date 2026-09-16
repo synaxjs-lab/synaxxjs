@@ -7,7 +7,7 @@ import {
 } from '../types';
 import { MessageItem } from './MessageItem';
 import { MessageComposer } from './MessageComposer';
-import { TimeBanner, TimeRemainingPill } from './TimeBanner';
+import { TimeRemainingPill } from './TimeBanner';
 import { LogoMark } from './LogoMark';
 import {
   Phone,
@@ -78,7 +78,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
   useEffect(() => {
     if (!timeStatus) return;
 
-    const interval = window.setInterval(() => {
+    const tick = () => {
       setDisplayedTimeStatus((previous) => {
         if (!previous || previous.isExpired) return previous;
 
@@ -92,13 +92,18 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
           previous.remainingSeconds - elapsedSinceServerTick
         );
 
+        if (nextRemaining === previous.remainingSeconds) return previous;
+
         return {
           ...previous,
           remainingSeconds: nextRemaining,
           isExpired: nextRemaining <= 0,
         };
       });
-    }, 250);
+    };
+
+    tick();
+    const interval = window.setInterval(tick, 1000);
 
     return () => window.clearInterval(interval);
   }, [timeStatus]);
@@ -303,14 +308,6 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
       id="synax-chat-room"
       className="fixed inset-0 z-10 w-full h-[100dvh] overflow-hidden bg-[#04060c] text-slate-100 select-none"
     >
-      {/* Server timer visibility is controlled by Admin. */}
-      {(settings as AppSettings & { showTimerToUsers?: boolean }).showTimerToUsers !== false &&
-        displayedTimeStatus && (
-          <div className="hidden md:block shrink-0">
-            <TimeBanner timeStatus={displayedTimeStatus} />
-          </div>
-        )}
-
       {/* Fixed header. It does not animate or move while scrolling. */}
       <header className="absolute inset-x-0 top-0 z-40 w-full bg-slate-950 border-b border-slate-800/80">
         <div className="w-full min-w-0 px-2 sm:px-4 md:px-6 py-2">
@@ -378,7 +375,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
             <div className="shrink-0 flex items-center gap-1 md:gap-0">
               {(settings as AppSettings & { showTimerToUsers?: boolean }).showTimerToUsers !== false &&
                 displayedTimeStatus && (
-                  <div className="shrink-0 min-w-[72px] sm:min-w-[82px] md:hidden">
+                  <div className="shrink-0 min-w-[82px] sm:min-w-[92px]">
                     <TimeRemainingPill
                       secondsLeft={displayedTimeStatus.remainingSeconds}
                       isExpired={displayedTimeStatus.isExpired}
