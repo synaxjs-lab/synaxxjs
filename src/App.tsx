@@ -95,30 +95,31 @@ export default function App() {
   // Global WebSocket event listeners (Time ticks, incoming calls, locks)
   useEffect(() => {
     const unsubTime = socketService.on('time:tick', (data) => {
-      if (data.timeStatus) {
-        setTimeStatus(data.timeStatus);
+      if (!data.timeStatus) return;
+
+      // A device should only render its own authoritative countdown.
+      if (data.userId && currentUser?.id && data.userId !== currentUser.id) {
+        return;
       }
+
+      setTimeStatus({
+        ...data.timeStatus,
+        remainingSeconds: Math.max(
+          0,
+          Math.floor(Number(data.timeStatus.remainingSeconds) || 0)
+        ),
+      });
     });
 
     const handleIncomingCall = (data: any) => {
-      const callerId =
-        data.fromUserId ||
-        data.callerId ||
-        (currentUser?.id === 'person_1' ? 'person_2' : 'person_1');
-
-      const callerProfile =
-        callerId === 'person_1' ? person1 : person2;
-
+      const other = currentUser?.id === 'person_1' ? person2 : person1;
       setActiveCall({
         role: 'callee',
         status: 'ringing',
         callType: data.callType || 'voice',
-        otherUserId: callerId,
-        otherUserName:
-          callerProfile?.nickname ||
-          callerProfile?.name ||
-          'Unknown Caller',
-        otherUserPfp: callerProfile?.pfpUrl || '',
+        otherUserId: data.fromUserId || data.callerId || (currentUser?.id === 'person_1' ? 'person_2' : 'person_1'),
+        otherUserName: other?.name || 'Sanctuary Partner',
+        otherUserPfp: other?.pfpUrl || '',
         offerSdp: data.sdp,
       });
     };
@@ -178,9 +179,6 @@ export default function App() {
     const loginRes = await ApiService.login(selectedUserId, password);
     setCurrentUser(loginRes.user);
 
-    // The authenticated response contains the complete other-user profile,
-    // including the PFP. Keep the shared profile state in sync so ChatRoom
-    // never falls back to the placeholder/logo.
     if (loginRes.user.id === 'person_1') {
       setPerson1(loginRes.user);
       if (loginRes.otherUser) setPerson2(loginRes.otherUser);
