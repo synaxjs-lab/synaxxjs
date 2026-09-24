@@ -254,8 +254,10 @@ export const ApiService = {
     return data.message;
   },
 
-  async toggleReaction(messageId: string, emoji: string) {
+  async toggleReaction(messageId: string, emoji: string): Promise<{ success: boolean; reactions: Record<string, string> }> {
     const token = ApiService.getToken();
+    if (!token) throw new Error('Not authenticated');
+
     const res = await fetch(`/api/messages/${messageId}/reaction`, {
       method: 'POST',
       headers: {
@@ -263,8 +265,15 @@ export const ApiService = {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ emoji }),
+      cache: 'no-store',
     });
-    return res.json();
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to update reaction');
+    }
+
+    return data;
   },
 
   async editMessage(messageId: string, text: string) {
