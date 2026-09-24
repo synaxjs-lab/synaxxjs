@@ -122,16 +122,24 @@ class SocketService {
     }
 
     try {
-      const res = await fetch('/api/call/signal', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-        cache: 'no-store',
-        keepalive: payload.type === 'call:end' || payload.type === 'call:reject',
-      });
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 8000);
+      let res: Response;
+      try {
+        res = await fetch('/api/call/signal', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+          cache: 'no-store',
+          keepalive: payload.type === 'call:end' || payload.type === 'call:reject',
+          signal: controller.signal,
+        });
+      } finally {
+        window.clearTimeout(timeout);
+      }
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -152,10 +160,18 @@ class SocketService {
 
     try {
       const url = `/api/call/signals?callId=${encodeURIComponent(callId)}&since=${encodeURIComponent(Date.now() - 60_000)}`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      });
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 5000);
+      let res: Response;
+      try {
+        res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+      } finally {
+        window.clearTimeout(timeout);
+      }
       if (!res.ok) return null;
       const data = await res.json();
       const rows = Array.isArray(data.signals) ? data.signals : [];
