@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useRef } from 'react';
+import { motion } from 'motion/react';
 import { ChatMessage } from '../types';
 import {
   Play,
@@ -14,6 +14,7 @@ import {
   Copy,
   Check,
   CheckCheck,
+  Clock,
   PinOff
 } from 'lucide-react';
 
@@ -33,7 +34,7 @@ interface MessageItemProps {
 
 const QUICK_REACTIONS = ['❤️', '✨', '🌙', '🔥', '😊', '🤍'];
 
-const MessageItemBase: React.FC<MessageItemProps> = ({
+export const MessageItem: React.FC<MessageItemProps> = ({
   message,
   currentUserId,
   senderName,
@@ -57,28 +58,6 @@ const MessageItemBase: React.FC<MessageItemProps> = ({
   const [copied, setCopied] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Close the mobile action menu when tapping anywhere outside this message.
-  useEffect(() => {
-    if (!showActionsMenu) return;
-
-    const handleOutsidePointer = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      const messageElement = document.getElementById(`msg-${message.id}`);
-
-      if (messageElement && target && !messageElement.contains(target)) {
-        setShowActionsMenu(false);
-        setShowReactionPicker(false);
-      }
-    };
-
-    document.addEventListener('pointerdown', handleOutsidePointer);
-
-    return () => {
-      document.removeEventListener('pointerdown', handleOutsidePointer);
-    };
-  }, [showActionsMenu, message.id]);
-
 
   // System Message
   if (isSystem) {
@@ -158,9 +137,14 @@ const MessageItemBase: React.FC<MessageItemProps> = ({
   return (
     <div
       id={`msg-${message.id}`}
-      className={`group relative flex gap-3 my-2.5 px-2 md:px-4 cursor-default ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
+      className={`group relative flex w-full gap-2.5 sm:gap-3 my-2.5 px-1.5 sm:px-2 md:px-4 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
       onClick={() => {
-        if (window.matchMedia('(max-width: 767px)').matches) {
+        if (
+          typeof window !== 'undefined' &&
+          window.matchMedia('(max-width: 767px)').matches &&
+          !message.deleted &&
+          !isEditing
+        ) {
           setShowActionsMenu((prev) => !prev);
           setShowReactionPicker(false);
         }
@@ -171,12 +155,12 @@ const MessageItemBase: React.FC<MessageItemProps> = ({
         <img
           src={senderPfp}
           alt={senderName}
-          className="w-8 h-8 rounded-full object-cover border border-slate-700/60 shadow-sm"
+          className="block w-8 h-8 rounded-full object-cover object-center aspect-square border border-slate-700/60 shadow-sm" 
         />
       </div>
 
       {/* Message Content Bubble Container */}
-      <div className={`relative max-w-[85%] sm:max-w-md md:max-w-lg flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+      <div className={`relative min-w-0 max-w-[calc(100%-44px)] sm:max-w-md md:max-w-lg flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
         {/* Pinned Tag */}
         {message.isPinned && (
           <div className="flex items-center gap-1 text-[10px] text-amber-400 font-mono uppercase tracking-wider mb-1 px-1">
@@ -205,7 +189,7 @@ const MessageItemBase: React.FC<MessageItemProps> = ({
 
         {/* The Main Bubble */}
         <div
-          className={`relative p-3.5 sm:p-4 rounded-3xl text-sm leading-relaxed transition-all shadow-md ${
+          className={`relative max-w-full p-3 sm:p-4 rounded-3xl text-sm leading-relaxed shadow-md ${
             isMe
               ? 'bg-gradient-to-br from-indigo-950/90 via-indigo-900/80 to-blue-950/90 text-white rounded-tr-xs border border-indigo-400/40 shadow-[0_4px_25px_rgba(99,102,241,0.25)] backdrop-blur-xl'
               : 'bg-gradient-to-br from-slate-900/90 via-purple-950/60 to-slate-950/90 text-slate-100 rounded-tl-xs border border-purple-400/30 shadow-[0_4px_25px_rgba(168,85,247,0.18)] backdrop-blur-xl'
@@ -223,7 +207,6 @@ const MessageItemBase: React.FC<MessageItemProps> = ({
               <textarea
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
                 className="w-full p-2 text-xs bg-slate-950/80 rounded-xl border border-slate-700 text-white focus:outline-none"
                 rows={2}
                 autoFocus
@@ -254,9 +237,31 @@ const MessageItemBase: React.FC<MessageItemProps> = ({
                     src={message.fileUrl}
                     alt={message.fileName || 'Shared photo'}
                     onClick={() => onOpenImage(message.fileUrl!)}
-                    className="max-h-72 w-full object-cover hover:scale-102 transition-transform"
+                    className="block max-h-72 w-full max-w-[78vw] object-cover" 
                     loading="lazy"
                   />
+                </div>
+              )}
+
+
+              {/* Video message */}
+              {(message.type as string) === 'video' && message.fileUrl && (
+                <div className="mb-2 overflow-hidden rounded-2xl max-w-full bg-black/20">
+                  <video
+                    src={message.fileUrl}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="block w-full max-w-[min(78vw,420px)] max-h-80 rounded-2xl object-contain bg-black"
+                  >
+                    Your browser does not support video playback.
+                  </video>
+
+                  {message.fileName && (
+                    <div className="px-2.5 py-2 text-[10px] text-slate-300/80 truncate">
+                      {message.fileName}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -342,301 +347,261 @@ const MessageItemBase: React.FC<MessageItemProps> = ({
         </div>
 
         {/* Emoji Reactions Tray */}
-        {message.reactions && Object.keys(message.reactions).length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1 z-10">
-            {Object.entries(message.reactions).map(([uid, emoji]) => (
+        {message.reactions && Object.keys(message.reactions).length > 0 && (() => {
+          const counts: Record<string, number> = {};
+          Object.values(message.reactions).forEach((emoji) => {
+            if (emoji) counts[emoji] = (counts[emoji] || 0) + 1;
+          });
+          const myReaction = message.reactions[currentUserId];
+
+          return (
+            <div className="flex flex-wrap gap-1 mt-1 z-10">
+              {Object.entries(counts).map(([emoji, count]) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onReact(message.id, emoji);
+                  }}
+                  title={`${count} reaction${count === 1 ? '' : 's'}${myReaction === emoji ? ' • Your reaction' : ''}`}
+                  className={`min-h-[22px] px-2 py-0.5 rounded-full text-xs flex items-center gap-1.5 border transition-all ${
+                    myReaction === emoji
+                      ? 'bg-indigo-950/90 border-indigo-400/60 text-indigo-100 shadow-[0_0_12px_rgba(99,102,241,0.18)]'
+                      : 'bg-slate-900/90 border-slate-700 text-slate-200'
+                  } hover:border-indigo-400/60 hover:bg-slate-800/90`}
+                >
+                  <span className="text-sm leading-none">{emoji}</span>
+                  {count > 1 && (
+                    <span className="text-[10px] font-semibold tabular-nums opacity-80">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* Mobile actions: tap the message; no three-dot button */}
+        {!message.deleted && showActionsMenu && (
+          <div
+            className={`md:hidden mt-1.5 flex flex-wrap items-center gap-1 p-1.5 rounded-2xl bg-slate-950 border border-slate-700/80 shadow-lg max-w-full ${
+              isMe ? 'justify-end' : 'justify-start'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative">
               <button
-                key={uid}
                 type="button"
-                onClick={() => onReact(message.id, emoji)}
-                className={`px-2 py-0.5 rounded-full text-xs flex items-center gap-1 border transition-all ${
-                  uid === currentUserId
-                    ? 'bg-indigo-950/80 border-indigo-500/50 text-indigo-200'
-                    : 'bg-slate-900/80 border-slate-700 text-slate-300'
-                }`}
+                onClick={() => setShowReactionPicker((prev) => !prev)}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 bg-slate-900"
+                aria-label="Add reaction"
               >
-                <span>{emoji}</span>
+                <Smile className="w-4 h-4" />
               </button>
-            ))}
+
+              {showReactionPicker && (
+                <div
+                  className="absolute bottom-full left-0 mb-1 flex items-center gap-0.5 p-1.5 rounded-2xl bg-slate-950 border border-slate-700 shadow-xl z-50"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {QUICK_REACTIONS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => {
+                        onReact(message.id, emoji);
+                        setShowReactionPicker(false);
+                        setShowActionsMenu(false);
+                      }}
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-base active:bg-slate-800"
+                      aria-label={`React ${emoji}`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                onReply(message);
+                setShowActionsMenu(false);
+                setShowReactionPicker(false);
+              }}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 bg-slate-900"
+              aria-label="Reply"
+            >
+              <Reply className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                onPin(message.id);
+                setShowActionsMenu(false);
+                setShowReactionPicker(false);
+              }}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 bg-slate-900"
+              aria-label={message.isPinned ? 'Unpin' : 'Pin'}
+            >
+              {message.isPinned ? (
+                <PinOff className="w-4 h-4 text-amber-400" />
+              ) : (
+                <Pin className="w-4 h-4" />
+              )}
+            </button>
+
+            {message.text && (
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleCopy();
+                  setShowActionsMenu(false);
+                }}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 bg-slate-900"
+                aria-label="Copy"
+              >
+                {copied ? (
+                  <Check className="w-4 h-4 text-emerald-400" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+              </button>
+            )}
+
+            {isMe && message.type === 'text' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(true);
+                  setShowActionsMenu(false);
+                  setShowReactionPicker(false);
+                }}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 bg-slate-900"
+                aria-label="Edit"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+            )}
+
+            {isMe && (
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete(message.id);
+                  setShowActionsMenu(false);
+                  setShowReactionPicker(false);
+                }}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-red-300 bg-slate-900"
+                aria-label="Delete"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         )}
 
-        {/* Message Actions
-            Desktop: hover toolbar.
-            Mobile: tap the message itself. No floating three-dot button.
-            The mobile toolbar is anchored to the bubble so it never covers the PFP.
-        */}
+        {/* Desktop hover actions */}
         {!message.deleted && (
-          <AnimatePresence initial={false}>
-            {(showActionsMenu || false) && (
-              <motion.div
-                key={`actions-${message.id}`}
-                initial={{ opacity: 0, y: 6, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 4, scale: 0.96 }}
-                transition={{ duration: 0.16, ease: 'easeOut' }}
-                onClick={(e) => e.stopPropagation()}
-                className={`md:hidden flex w-fit max-w-[calc(100vw-90px)] items-center gap-1 p-1 mb-1 rounded-2xl bg-slate-950/98 border border-slate-700/80 shadow-[0_8px_30px_rgba(0,0,0,0.45)] backdrop-blur-xl overflow-x-auto ${
-                  isMe ? 'ml-auto' : 'mr-auto'
-                }`}
+          <div
+            className={`hidden md:flex absolute top-0 opacity-0 group-hover:opacity-100 items-center gap-1 p-1 rounded-xl bg-slate-900/95 border border-slate-700/80 shadow-lg backdrop-blur-md z-20 ${
+              isMe ? 'right-full mr-2' : 'left-full ml-2'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowReactionPicker((prev) => !prev)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                title="Add reaction"
               >
-                {/* Quick Reaction */}
-                <div className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowReactionPicker((prev) => !prev);
-                    }}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 active:bg-slate-800 active:scale-95 transition"
-                    aria-label="Add reaction"
-                  >
-                    <Smile className="w-4 h-4" />
-                  </button>
+                <Smile className="w-3.5 h-3.5" />
+              </button>
 
-                  <AnimatePresence>
-                    {showReactionPicker && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 5, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                        transition={{ duration: 0.14 }}
-                        onClick={(e) => e.stopPropagation()}
-                        className={`absolute bottom-full mb-1 flex items-center gap-0.5 p-1.5 rounded-2xl bg-slate-950 border border-slate-700 shadow-xl z-50 ${
-                          isMe ? 'right-0' : 'left-0'
-                        }`}
-                      >
-                        {QUICK_REACTIONS.map((emoji) => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onReact(message.id, emoji);
-                              setShowReactionPicker(false);
-                              setShowActionsMenu(false);
-                            }}
-                            className="w-9 h-9 rounded-xl flex items-center justify-center text-base active:bg-slate-800 active:scale-90 transition-transform"
-                            aria-label={`React ${emoji}`}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+              {showReactionPicker && (
+                <div className="absolute bottom-full left-0 mb-1 flex items-center gap-1 p-1.5 rounded-2xl bg-slate-900 border border-slate-700 shadow-xl z-30">
+                  {QUICK_REACTIONS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => {
+                        onReact(message.id, emoji);
+                        setShowReactionPicker(false);
+                      }}
+                      className="p-1 hover:scale-125 transition-transform text-sm"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
                 </div>
-
-                {/* Reply */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onReply(message);
-                    setShowActionsMenu(false);
-                    setShowReactionPicker(false);
-                  }}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 active:bg-slate-800 active:scale-95 transition shrink-0"
-                  aria-label="Reply"
-                >
-                  <Reply className="w-4 h-4" />
-                </button>
-
-                {/* Pin */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onPin(message.id);
-                    setShowActionsMenu(false);
-                    setShowReactionPicker(false);
-                  }}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 active:bg-slate-800 active:scale-95 transition shrink-0"
-                  aria-label={message.isPinned ? 'Unpin' : 'Pin'}
-                >
-                  {message.isPinned ? (
-                    <PinOff className="w-4 h-4 text-amber-400" />
-                  ) : (
-                    <Pin className="w-4 h-4" />
-                  )}
-                </button>
-
-                {/* Copy */}
-                {message.text && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCopy();
-                      setShowActionsMenu(false);
-                      setShowReactionPicker(false);
-                    }}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 active:bg-slate-800 active:scale-95 transition shrink-0"
-                    aria-label="Copy message"
-                  >
-                    {copied ? (
-                      <Check className="w-4 h-4 text-emerald-400" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
-                  </button>
-                )}
-
-                {/* Edit */}
-                {isMe && message.type === 'text' && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsEditing(true);
-                      setShowActionsMenu(false);
-                      setShowReactionPicker(false);
-                    }}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 active:bg-slate-800 active:scale-95 transition shrink-0"
-                    aria-label="Edit message"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                )}
-
-                {/* Delete */}
-                {isMe && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(message.id);
-                      setShowActionsMenu(false);
-                      setShowReactionPicker(false);
-                    }}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-red-300 active:bg-red-950/50 active:scale-95 transition shrink-0"
-                    aria-label="Delete message"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </motion.div>
-            )}
-
-            {/* Desktop toolbar */}
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className={`hidden md:flex absolute top-0 ${
-                isMe ? 'right-full mr-2' : 'left-full ml-2'
-              } opacity-0 group-hover:opacity-100 items-center gap-1 p-1 rounded-xl bg-slate-900/95 border border-slate-700/80 shadow-lg backdrop-blur-md z-20`}
-            >
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowReactionPicker((prev) => !prev);
-                  }}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                  title="Add reaction"
-                >
-                  <Smile className="w-3.5 h-3.5" />
-                </button>
-
-                {showReactionPicker && (
-                  <div className="absolute bottom-full left-0 mb-1 flex items-center gap-1 p-1.5 rounded-2xl bg-slate-900 border border-slate-700 shadow-xl z-30">
-                    {QUICK_REACTIONS.map((emoji) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onReact(message.id, emoji);
-                          setShowReactionPicker(false);
-                        }}
-                        className="p-1 hover:scale-125 transition-transform text-sm"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReply(message);
-                }}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                title="Reply"
-              >
-                <Reply className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPin(message.id);
-                }}
-                className="p-1 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-slate-800"
-                title={message.isPinned ? 'Unpin' : 'Pin'}
-              >
-                {message.isPinned ? (
-                  <PinOff className="w-3.5 h-3.5 text-amber-400" />
-                ) : (
-                  <Pin className="w-3.5 h-3.5" />
-                )}
-              </button>
-
-              {message.text && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCopy();
-                  }}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                  title="Copy text"
-                >
-                  {copied ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
-                </button>
-              )}
-
-              {isMe && message.type === 'text' && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsEditing(true);
-                  }}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                  title="Edit message"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-
-              {isMe && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(message.id);
-                  }}
-                  className="p-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800"
-                  title="Delete for everyone"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
               )}
             </div>
-          </AnimatePresence>
-        )}
-      </div>
+
+            <button
+              type="button"
+              onClick={() => onReply(message)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              title="Reply"
+            >
+              <Reply className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onPin(message.id)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-slate-800"
+              title={message.isPinned ? 'Unpin' : 'Pin'}
+            >
+              {message.isPinned ? (
+                <PinOff className="w-3.5 h-3.5 text-amber-400" />
+              ) : (
+                <Pin className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            {message.text && (
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                title="Copy"
+              >
+                {copied ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+            )}
+
+            {isMe && message.type === 'text' && (
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                title="Edit"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {isMe && (
+              <button
+                type="button"
+                onClick={() => onDelete(message.id)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800"
+                title="Delete for everyone"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}      </div>
     </div>
   );
 };
-
-export const MessageItem = React.memo(MessageItemBase);
