@@ -94,8 +94,11 @@ export class WebRTCManager {
     this.onConnectionState?.('connecting');
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    // Trickle ICE sends candidates as soon as the browser gathers them, rather
-    // than making the caller wait several seconds for the whole ICE gathering phase.
+    // Include a complete ICE candidate set in the SDP as well as trickled
+    // candidates. This is especially important for mobile-to-desktop calls:
+    // if a candidate polling request is delayed, the peer still receives the
+    // candidates gathered in the offer itself. Never wait forever.
+    await this.waitForIceGatheringComplete(pc, 7000);
     return pc.localDescription?.toJSON() || offer;
   }
 
@@ -116,7 +119,31 @@ export class WebRTCManager {
     this.onConnectionState?.('connecting');
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
+    // Return an answer containing gathered candidates too, so the caller can
+    // establish ICE even if an individual candidate signal is delayed.
+    await this.waitForIceGatheringComplete(pc, 7000);
     return pc.localDescription?.toJSON() || answer;
+  }
+
+  private async waitForIceGatheringComplete(pc: RTCPeerConnection, timeoutMs: number): Promise<void> {
+    if (pc.iceGatheringState === 'complete') return;
+
+    await new Promise<void>((resolve) => {
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        window.clearTimeout(timeout);
+        pc.removeEventListener('icegatheringstatechange', onState);
+        resolve();
+      };
+      const onState = () => {
+        if (pc.iceGatheringState === 'complete') finish();
+      };
+      const timeout = window.setTimeout(finish, timeoutMs);
+      pc.addEventListener('icegatheringstatechange', onState);
+      if (pc.iceGatheringState === 'complete') finish();
+    });
   }
 
   async handleAnswer(sdp: RTCSessionDescriptionInit) {
