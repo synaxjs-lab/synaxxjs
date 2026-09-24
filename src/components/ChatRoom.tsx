@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   UserProfile,
   ChatMessage,
@@ -320,48 +320,52 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
     }
   };
 
-  const handleTyping = useCallback((isTyping: boolean) => {
+  const handleTyping = (isTyping: boolean) => {
     socketService.sendTyping(isTyping);
-  }, []);
+  };
 
-  const handleUpload = useCallback(async (file: File | Blob, name?: string) => {
-    return ApiService.uploadFile(file, name);
-  }, []);
+  const handleUpload = async (file: File | Blob, name?: string) => {
+    return await ApiService.uploadFile(file, name);
+  };
 
-  const handleReact = useCallback(async (messageId: string, emoji: string) => {
-    await ApiService.toggleReaction(messageId, emoji);
-  }, []);
+  const handleReact = async (messageId: string, emoji: string) => {
+    try {
+      const result = await ApiService.toggleReaction(messageId, emoji);
 
-  const handlePin = useCallback(async (messageId: string) => {
+      // Render immediately from the authoritative server response.
+      // The WebSocket event will reconcile the partner's UI as well.
+      if (result?.reactions && typeof result.reactions === 'object') {
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === messageId
+              ? { ...message, reactions: result.reactions }
+              : message
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Failed to update reaction:', err);
+    }
+  };
+
+  const handlePin = async (messageId: string) => {
     await ApiService.togglePin(messageId);
-  }, []);
+  };
 
-  const handleEdit = useCallback(async (messageId: string, text: string) => {
+  const handleEdit = async (messageId: string, text: string) => {
     await ApiService.editMessage(messageId, text);
-  }, []);
+  };
 
-  const handleDelete = useCallback(async (messageId: string) => {
+  const handleDelete = async (messageId: string) => {
     await ApiService.deleteMessage(messageId);
-  }, []);
+  };
 
-  const handleReply = useCallback((message: ChatMessage) => {
-    setReplyingTo(message);
-  }, []);
+  // Filter messages if search query active
+  const filteredMessages = searchQuery.trim()
+    ? messages.filter((m) => m.text?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : messages;
 
-  const handleOpenImage = useCallback((url: string) => {
-    setLightboxImage(url);
-  }, []);
-
-  const searchTerm = searchQuery.trim().toLowerCase();
-  const filteredMessages = useMemo(
-    () => (searchTerm ? messages.filter((m) => m.text?.toLowerCase().includes(searchTerm)) : messages),
-    [messages, searchTerm]
-  );
-
-  const pinnedMessage = useMemo(
-    () => messages.find((m) => m.isPinned && !m.deleted),
-    [messages]
-  );
+  const pinnedMessage = messages.find((m) => m.isPinned && !m.deleted);
 
   const formatLastSeen = (timestamp: number) => {
     if (!timestamp) return 'Recently';
@@ -377,11 +381,11 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
     >
       {/* Fixed header. It does not animate or move while scrolling. */}
       <header className="absolute inset-x-0 top-0 z-40 w-full bg-slate-950 border-b border-slate-800/80">
-        <div className="w-full min-w-0 px-1.5 sm:px-4 md:px-6 py-1.5 sm:py-2">
-          <div className="flex min-w-0 items-center gap-1 sm:gap-3">
+        <div className="w-full min-w-0 px-2 sm:px-4 md:px-6 py-2">
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
             {/* Other user */}
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
-              <div className="relative w-8 h-8 sm:w-11 sm:h-11 rounded-full overflow-hidden border-2 border-indigo-500/50 shrink-0">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <div className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden border-2 border-indigo-500/50 shrink-0">
                 <img
                   src={otherUser.pfpUrl || ''}
                   alt={otherUser.name}
@@ -410,11 +414,11 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
 
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <h2 className="min-w-0 max-w-[120px] sm:max-w-[220px] truncate text-[11px] sm:text-base font-bold text-white font-cinzel tracking-anime-header">
+                  <h2 className="min-w-0 max-w-[100px] sm:max-w-[220px] truncate text-sm sm:text-base font-bold text-white font-cinzel tracking-anime-header">
                     {otherUser.nickname || otherUser.name}
                   </h2>
 
-                  <div className="hidden sm:block shrink-0" title={`Personal Mark: ${otherUser.logo.name}`}>
+                  <div className="shrink-0" title={`Personal Mark: ${otherUser.logo.name}`}>
                     <LogoMark
                       logo={otherUser.logo}
                       size="sm"
@@ -424,7 +428,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                   </div>
                 </div>
 
-                <p className="text-[8px] sm:text-[11px] truncate leading-none">
+                <p className="text-[9px] sm:text-[11px] truncate">
                   {isOtherTyping ? (
                     <span className="text-indigo-400">typing...</span>
                   ) : otherPresence.isOnline ? (
@@ -439,10 +443,10 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
             </div>
 
             {/* Controls: compact enough to stay visible on narrow phones */}
-            <div className="shrink-0 flex items-center gap-0.5 md:gap-0">
+            <div className="shrink-0 flex items-center gap-1 md:gap-0">
               {(settings as AppSettings & { showTimerToUsers?: boolean }).showTimerToUsers !== false &&
                 displayedTimeStatus && (
-                  <div className="shrink-0 min-w-[62px] sm:min-w-[92px]">
+                  <div className="shrink-0 min-w-[82px] sm:min-w-[92px]">
                     <TimeRemainingPill
                       secondsLeft={displayedTimeStatus.remainingSeconds}
                       isExpired={displayedTimeStatus.isExpired}
@@ -461,7 +465,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                       settings.restrictionsOnExpire.disableVoiceCalls
                     )
                   }
-                  className="md:hidden w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-slate-900 border border-slate-700/80 text-indigo-300 flex items-center justify-center shrink-0 disabled:opacity-40"
+                  className="md:hidden w-9 h-9 rounded-xl bg-slate-900 border border-slate-700/80 text-indigo-300 flex items-center justify-center shrink-0 disabled:opacity-40"
                   title="Voice call"
                 >
                   <Phone className="w-4 h-4" />
@@ -479,7 +483,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                       settings.restrictionsOnExpire.disableVideoCalls
                     )
                   }
-                  className="md:hidden w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-slate-900 border border-slate-700/80 text-pink-300 flex items-center justify-center shrink-0 disabled:opacity-40"
+                  className="md:hidden w-9 h-9 rounded-xl bg-slate-900 border border-slate-700/80 text-pink-300 flex items-center justify-center shrink-0 disabled:opacity-40"
                   title="Video call"
                 >
                   <Video className="w-4 h-4" />
@@ -491,7 +495,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                 id="open-profile-settings-btn-mobile"
                 type="button"
                 onClick={onOpenProfile}
-                className="md:hidden w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-slate-900 border border-slate-800 text-slate-300 flex items-center justify-center shrink-0"
+                className="md:hidden w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 flex items-center justify-center shrink-0"
                 title="Profile settings"
                 aria-label="Profile settings"
               >
@@ -503,7 +507,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                 id="user-logout-btn-mobile"
                 type="button"
                 onClick={onLogout}
-                className="md:hidden w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-slate-900 border border-slate-800 text-slate-300 flex items-center justify-center shrink-0 hover:text-red-400"
+                className="md:hidden w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 flex items-center justify-center shrink-0 hover:text-red-400"
                 title="Logout"
                 aria-label="Logout"
               >
@@ -645,7 +649,6 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                 : otherUser;
 
             return (
-              <div key={`row-${msg.id}`} className="synax-message-row">
               <MessageItem
                 key={msg.id}
                 message={msg}
@@ -656,13 +659,12 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
                 }
                 onReact={handleReact}
-                onReply={handleReply}
+                onReply={(m) => setReplyingTo(m)}
                 onPin={handlePin}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onOpenImage={handleOpenImage}
+                onOpenImage={(url) => setLightboxImage(url)}
               />
-              </div>
             );
           })}
 
