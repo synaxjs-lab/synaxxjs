@@ -141,11 +141,15 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
     rtc.onConnectionState = (state) => {
       if (state === 'connected') {
         setStatus('connected');
-        setConnectionMessage('Connected (WebRTC Peer-to-Peer)');
+        setHasError(null);
+        setConnectionMessage('Connected');
       } else if (state === 'connecting') {
-        setConnectionMessage('Establishing P2P link...');
-      } else if (state === 'disconnected' || state === 'failed') {
-        setConnectionMessage('Connection lost or failed');
+        setConnectionMessage('Connecting securely…');
+      } else if (state === 'disconnected') {
+        setConnectionMessage('Connection interrupted…');
+      } else if (state === 'failed') {
+        setHasError('The devices could not establish a WebRTC connection.');
+        setConnectionMessage('Connection failed');
       }
     };
 
@@ -258,14 +262,23 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
       let offerSdp = callState.offerSdp;
       if (!offerSdp) {
         setConnectionMessage('Recovering secure call offer…');
-        const recovered = await socketService.getCallOffer(callState.callId);
-        if (recovered?.sdp) offerSdp = recovered.sdp;
+        // A mobile browser can render the incoming card a fraction of a second
+        // before the mailbox row is visible. Retry briefly instead of making
+        // Accept fail randomly.
+        for (let attempt = 0; attempt < 4 && !offerSdp; attempt++) {
+          const recovered = await socketService.getCallOffer(callState.callId);
+          if (recovered?.sdp) {
+            offerSdp = recovered.sdp;
+            break;
+          }
+          await new Promise((resolve) => window.setTimeout(resolve, 350));
+        }
       }
       if (!offerSdp) {
-        throw new Error('The incoming call offer was not received yet. Please wait one second and try Accept again.');
+        throw new Error('Secure call offer is unavailable. Please hang up and start the call again.');
       }
       await enableAudio();
-      setConnectionMessage('Accessing media devices...');
+      setConnectionMessage('Accessing microphone…');
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -287,12 +300,14 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
         localVideoRef.current.srcObject = stream;
       }
 
+      setConnectionMessage('Creating secure connection…');
       const answer = await rtcRef.current.handleOfferAndCreateAnswer(
         offerSdp,
         callState.callType,
         stream
       );
 
+      setConnectionMessage('Sending answer…');
       const sent = await socketService.sendCallSignal({
         callId: callState.callId,
         type: 'call:answer',
@@ -301,7 +316,7 @@ export const CallModal: React.FC<CallModalProps> = ({ callState, onClose }) => {
       });
       if (!sent) throw new Error('Your answer could not be delivered to the caller.');
       setStatus('calling');
-      setConnectionMessage('Connecting secure audio…');
+      setConnectionMessage('Connecting securely…');
     } catch (err: any) {
       console.error('Failed to answer call:', err);
       setHasError(err.message || 'Media permission failed');
