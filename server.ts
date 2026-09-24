@@ -1035,77 +1035,9 @@ async function startServer() {
           return;
         }
 
-        // WebRTC Signaling
-        if (data.type?.startsWith('call:')) {
-          if (clientInfo.userId === 'person_1' || clientInfo.userId === 'person_2') {
-            const targetId = clientInfo.userId === 'person_1' ? 'person_2' : 'person_1';
-
-            // Server-side check if calls are disabled by admin or time
-            const timeStatus = calculateTimeRemaining(clientInfo.userId);
-            if (timeStatus.isExpired && (db.settings.restrictionsOnExpire.disableVoiceCalls || db.settings.restrictionsOnExpire.disableVideoCalls)) {
-              ws.send(JSON.stringify({
-                type: 'call:error',
-                error: db.settings.timeOverMessage || 'Communication time has expired.'
-              }));
-              return;
-            }
-
-            if (data.callType === 'voice' && !db.settings.featuresEnabled.voiceCalls) {
-              ws.send(JSON.stringify({ type: 'call:error', error: 'Voice calls are disabled by Admin.' }));
-              return;
-            }
-            if (data.callType === 'video' && !db.settings.featuresEnabled.videoCalls) {
-              ws.send(JSON.stringify({ type: 'call:error', error: 'Video calls are disabled by Admin.' }));
-              return;
-            }
-
-            // Record one chat-history entry for each newly initiated call.
-            // This is intentionally inside the offer branch so the duplicated
-            // signaling compatibility broadcasts do not create duplicate history entries.
-            if (data.type === 'call:offer') {
-              const caller = db.users[clientInfo.userId] as any;
-              const target = db.users[targetId] as any;
-              const callKind = data.callType === 'video' ? 'video' : 'voice';
-
-              const callHistoryMessage = {
-                id: `msg_call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-                senderId: 'system',
-                type: 'system',
-                text: `📞 ${caller.name} started a ${callKind} call with ${target.name}.`,
-                timestamp: Date.now(),
-                status: 'read',
-                reactions: {}
-              };
-
-              db.messages.push(callHistoryMessage);
-              saveDbSync();
-              broadcast({
-                type: 'chat:new_message',
-                message: callHistoryMessage
-              });
-
-              // Legacy WebSocket compatibility: emit exactly one incoming-call event.
-              broadcast({
-                ...data,
-                type: 'call:incoming',
-                callerId: clientInfo.userId,
-                fromUserId: clientInfo.userId,
-                targetId
-              }, (c) => c.userId === targetId);
-
-              addLog(clientInfo.userId, `Initiated ${callKind} call`, `To ${targetId}`);
-            } else {
-              // Forward other signaling (answer, ice-candidate, reject, end) strictly to the other person
-              broadcast({
-                ...data,
-                callerId: clientInfo.userId,
-                fromUserId: clientInfo.userId,
-                targetId
-              }, (c) => c.userId === targetId);
-            }
-          }
-          return;
-        }
+        // WebRTC calls use the authenticated HTTP/Supabase signaling mailbox.
+        // Do not route call signals through the WebSocket; this prevents duplicate
+        // offers/answers/candidates and removes container-local signaling races.
       } catch (err) {
         console.error('WS message error:', err);
       }
@@ -1258,15 +1190,9 @@ async function startServer() {
         payload,
       });
 
-      // Fast path: if both users are connected to the same container, deliver
-      // immediately over WebSocket. Cross-container delivery still comes from
-      // the shared Supabase mailbox polling above. The client deduplicates both.
-      const pushedPayload = { ...payload, _signalId: id, _signalCreatedAt: signalCreatedAt };
-      broadcast(
-        { ...pushedPayload, type: data.type === 'call:offer' ? 'call:incoming' : data.type },
-        (client) => client.userId === targetUserId
-      );
-
+      // HTTP polling is the single authoritative delivery path for WebRTC
+      // signaling. Do not also broadcast through WebSocket: doing both can
+      // deliver duplicate answers/candidates and race the peer state machine.
       res.json({ success: true, id, createdAt: signalCreatedAt });
     } catch (err) {
       console.error('Failed to store call signal:', err);
