@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080a18">
+<meta name="description" content="Share large photos, videos, and files directly between devices with SYNAX Share.">
+<title>SYNAX Share — Send files simply</title>
+<style>
+:root{color-scheme:dark;--bg:#080a18;--panel:#11162a;--panel2:#171d34;--line:#293451;--text:#f7f8ff;--muted:#a1adc6;--purple:#7464ff;--pink:#cf5bd4;--green:#38d7a7;--red:#ff7d94;--yellow:#ffd17d;--radius:25px}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(ellipse at 10% 0%,#242052 0,transparent 38%),radial-gradient(ellipse at 100% 20%,#29113f 0,transparent 30%),var(--bg);color:var(--text)}body{min-height:100dvh}.wrap{width:min(700px,100%);margin:0 auto;padding:clamp(14px,4vw,30px);padding-bottom:calc(28px + env(safe-area-inset-bottom))}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:30px}.brand{display:flex;align-items:center;gap:11px}.logo{width:43px;height:43px;display:grid;place-items:center;border-radius:15px;background:linear-gradient(135deg,var(--purple),var(--pink));font-size:23px;font-weight:900;box-shadow:0 8px 26px #7464ff40}.brand strong{display:block;letter-spacing:.14em;font-size:13px}.brand small{display:block;color:var(--muted);font-size:11px;letter-spacing:.1em}.secure{display:flex;align-items:center;gap:7px;color:#c9c7ff;border:1px solid #37315e;border-radius:999px;padding:8px 11px;font-size:11px;white-space:nowrap}.secure i{width:7px;height:7px;background:var(--green);border-radius:50%}main{display:grid;gap:16px}.card{padding:clamp(20px,5vw,32px);border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(160deg,#13182eeb,#0e1223f5);box-shadow:0 24px 70px #0003}.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#bdb6ff;font-weight:800}.hero-icon{width:65px;height:65px;display:grid;place-items:center;background:#25214b;border:1px solid #474079;border-radius:22px;font-size:32px;margin-bottom:20px}.hero-title{font-size:clamp(32px,8vw,48px);line-height:1.03;letter-spacing:-.055em;margin:11px 0 12px}.gradient{color:#c4bbff}.subtitle{font-size:15px;line-height:1.55;color:var(--muted);margin:0}.picked{margin:16px 0 0;display:grid;gap:8px}.file-row{display:flex;align-items:center;gap:11px;min-width:0;background:#090d1c;border:1px solid #252e48;border-radius:14px;padding:12px}.file-icon{width:40px;height:40px;display:grid;place-items:center;background:#24204b;border-radius:12px;font-size:20px;flex:0 0 auto}.file-meta{min-width:0;flex:1}.file-name{font-size:13px;font-weight:700;overflow-wrap:anywhere}.file-size{font-size:11px;color:var(--muted);margin-top:2px}.total{font-size:12px;color:#c7c4ee;padding:2px 3px}.btn{width:100%;min-height:54px;border:0;border-radius:16px;padding:14px 17px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:transform .12s,filter .12s}.btn:active{transform:scale(.99)}.btn:disabled{opacity:.42;cursor:not-allowed}.primary{background:linear-gradient(110deg,#6657ff,#a14ad8);box-shadow:0 10px 27px #6657ff30}.dark-btn{background:#1a2239;border:1px solid #34405e;color:#eef0ff}.green-btn{background:linear-gradient(110deg,#0e9b7d,#18aa99);box-shadow:0 10px 27px #18aa9925}.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.pick{position:relative;overflow:hidden}.pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}.step-list{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:22px}.step{padding:13px 9px;border-radius:14px;background:#0a0e1e;border:1px solid #242e47;text-align:center}.step b{width:25px;height:25px;display:grid;place-items:center;margin:0 auto 7px;border-radius:9px;background:#30295f;color:#d9d4ff;font-size:12px}.step span{display:block;font-size:11px;font-weight:700}.step small{display:block;font-size:10px;color:var(--muted);margin-top:3px}.note{padding:14px 16px;border:1px solid #3a345f;border-radius:17px;background:#15132b;color:#c7c5ec;font-size:12px;line-height:1.55}.note strong{color:white}.note strong,.note b{font-weight:800}.status{margin-top:16px;border-radius:14px;padding:13px 14px;background:#090e1d;border:1px solid var(--line);color:#c3cce0;font-size:13px;line-height:1.5;overflow-wrap:anywhere}.status.good{border-color:#1c745f;color:#aaffdf}.status.bad{border-color:#713347;color:#ffc0cb}.status.warn{border-color:#78602e;color:#ffe1a8}.linkbox{display:flex;gap:8px;margin-top:18px}.linkbox input{min-width:0;flex:1;background:#090d1c;border:1px solid #303a58;border-radius:13px;padding:13px;color:#e9eaff;font-size:12px}.linkbox .smallcopy{width:auto;min-height:auto;padding:0 15px;flex:0 0 auto}.progress-block{display:none;margin-top:20px}.progress-head{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);margin-bottom:8px}.bar{height:10px;border-radius:99px;background:#252d46;overflow:hidden}.bar>i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--purple),var(--pink));transition:width .14s}.downloads{display:grid;gap:10px;margin-top:15px}.download-card{padding:14px;background:#090e1d;border:1px solid #2b3652;border-radius:15px}.download-card .file-name{margin-bottom:10px}.download-actions{display:grid;grid-template-columns:1fr auto;gap:8px}.download-actions a{width:100%;text-decoration:none}.delete-copy{border:1px solid #5a3447;background:#271521;color:#ffbdc9;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:800;cursor:pointer}.hidden{display:none!important}.footer{padding:18px 4px 0;text-align:center;color:#75809b;font-size:11px;line-height:1.6}.footer strong{color:#aeb9d2}.spinning{animation:spin 1.3s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}button:focus-visible,input:focus-visible{outline:3px solid #a9a0ff;outline-offset:3px}.warning-title{font-size:16px;margin:0 0 8px}.big-status{font-size:14px;font-weight:700}.download-all{margin-top:15px}
+@media(min-width:560px){.card{padding:34px}.btn-row{grid-template-columns:1fr 1fr}.hero-title{font-size:49px}.wrap{padding-top:28px}}
+@media(max-width:380px){.secure{font-size:10px;padding:7px 8px}.btn-row{grid-template-columns:1fr}.step-list{gap:6px}.step{padding:11px 4px}.step span{font-size:10px}.step small{font-size:9px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><div class="logo">↗</div><div><strong>SYNAX SHARE</strong><small>Send files simply</small></div></div>
+    <div class="secure"><i></i><span>No cloud file storage</span></div>
+  </header>
+  <main>
+    <section class="card" id="sendHome">
+      <div class="hero-icon">📤</div>
+      <div class="eyebrow">Photos · Videos · Documents</div>
+      <h1 class="hero-title">Send a file.<br><span class="gradient">That's it.</span></h1>
+      <p class="subtitle">Choose your files, share one link, and the other person taps it to receive. No login, no connection codes, no Supabase 50 MB upload limit.</p>
+      <div style="margin-top:24px">
+        <button class="btn dark-btn pick" id="pickButton">＋ &nbsp; Choose files<input id="fileInput" type="file" multiple aria-label="Choose photos, videos or any files"></button>
+      </div>
+      <div id="pickedFiles" class="picked"></div>
+      <button class="btn primary" id="createLinkButton" disabled style="margin-top:14px">Create share link <span aria-hidden="true">→</span></button>
+      <div class="step-list" aria-label="How it works">
+        <div class="step"><b>1</b><span>Choose</span><small>Your files</small></div>
+        <div class="step"><b>2</b><span>Share link</span><small>WhatsApp or SMS</small></div>
+        <div class="step"><b>3</b><span>They tap</span><small>Transfer starts</small></div>
+      </div>
+      <div class="status hidden" id="homeStatus" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="card hidden" id="sendWaiting">
+      <div class="hero-icon">🔗</div>
+      <div class="eyebrow">Your link is ready</div>
+      <h1 class="hero-title">Just share<br><span class="gradient">this link.</span></h1>
+      <p class="subtitle">Tap Share link and choose WhatsApp, Messages, or any app. Keep this page open. Your files start transferring when the other person taps “Receive files”.</p>
+      <div class="linkbox"><input id="shareLink" readonly aria-label="Share link"><button class="btn dark-btn smallcopy" id="copyLinkButton">Copy</button></div>
+      <div class="btn-row"><button class="btn primary" id="nativeShareButton">↗ Share link</button><button class="btn dark-btn" id="cancelButton">Cancel</button></div>
+      <div class="status warn" id="senderStatus" role="status" aria-live="polite">Waiting for the other person to open your link…</div>
+      <div class="progress-block" id="senderProgress"><div class="progress-head"><span id="senderProgressText">Preparing…</span><b id="senderProgressPct">0%</b></div><div class="bar"><i id="senderProgressBar"></i></div></div>
+      <div id="sentFiles" class="downloads"></div>
+    </section>
+
+    <section class="card hidden" id="receiveHome">
+      <div class="hero-icon">📥</div>
+      <div class="eyebrow">SYNAX Share link</div>
+      <h1 class="hero-title">Someone sent<br><span class="gradient">you files.</span></h1>
+      <p class="subtitle">Tap the button below. Keep this page open while the files arrive. When they finish, tap Download to save them to your phone or computer.</p>
+      <button class="btn green-btn" id="acceptButton" style="margin-top:24px">Receive files <span aria-hidden="true">→</span></button>
+      <div class="status hidden" id="receiverStatus" role="status" aria-live="polite"></div>
+      <div class="progress-block" id="receiverProgress"><div class="progress-head"><span id="receiverProgressText">Waiting for files…</span><b id="receiverProgressPct">0%</b></div><div class="bar"><i id="receiverProgressBar"></i></div></div>
+      <div id="receivedFiles" class="downloads"></div>
+    </section>
+
+    <section class="note" id="privacyNote"><strong>Simple and private.</strong> Your video or photo travels directly between the two devices. SYNAX Share does not store the media file in the cloud. Both people must be online, and the sender must keep this page open until the transfer finishes. Browser storage and network limits still apply; no free service can promise unlimited file size on every device.</section>
+  </main>
+  <footer class="footer"><strong>SYNAX SHARE</strong> · A separate page from SYNAX chat<br>Never close the page during a transfer.</footer>
+</div>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const CHUNK_SIZE = 64 * 1024;
+  const HIGH_WATER = 1024 * 1024;
+  const LOW_WATER = 256 * 1024;
+  const MEMORY_FALLBACK_MAX = 128 * 1024 * 1024;
+  const ICE_SERVERS = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ];
+  let role = 'send';
+  let roomId = '';
+  let shareUrl = '';
+  let selectedFiles = [];
+  let signalSocket = null;
+  let pc = null;
+  let channel = null;
+  let senderOfferStarted = false;
+  let receiverAccepted = false;
+  let transferStarted = false;
+  let transferFinished = false;
+  let remoteDescriptionReady = false;
+  let pendingCandidates = [];
+  let activeReceive = null;
+  let receiveQueue = Promise.resolve();
+  const pendingAcks = new Map();
+  const downloadUrls = new Set();
+  const receiveHandles = new Map();
+
+  function formatBytes(value) {
+    if (!Number.isFinite(value) || value < 0) return '—';
+    if (value < 1024) return value + ' B';
+    const units = ['KB', 'MB', 'GB', 'TB'];
+    let n = value / 1024, i = 0;
+    while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+    return n.toFixed(n >= 100 ? 0 : n >= 10 ? 1 : 2) + ' ' + units[i];
+  }
+  function safeName(value) {
+    const name = String(value || 'received-file').replace(/[\\/\0]/g, '_').replace(/^\.+$/, 'file').slice(0, 180);
+    return name || 'received-file';
+  }
+  function randomRoomId() {
+    const bytes = crypto.getRandomValues(new Uint8Array(18));
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
+  function showOnly(id) {
+    ['sendHome', 'sendWaiting', 'receiveHome'].forEach(name => $(name).classList.toggle('hidden', name !== id));
+  }
+  function setStatus(id, text, kind = '') {
+    const node = $(id);
+    node.textContent = text;
+    node.className = 'status' + (kind ? ' ' + kind : '');
+    node.classList.remove('hidden');
+  }
+  function updateProgress(prefix, label, complete, total) {
+    const wrap = $(prefix + 'Progress');
+    wrap.style.display = 'block';
+    const pct = total ? Math.max(0, Math.min(100, Math.floor(complete / total * 100))) : 0;
+    $(prefix + 'ProgressText').textContent = label;
+    $(prefix + 'ProgressPct').textContent = pct + '%';
+    $(prefix + 'ProgressBar').style.width = pct + '%';
+  }
+  function renderSelectedFiles() {
+    selectedFiles = Array.from($('fileInput').files || []);
+    const list = $('pickedFiles');
+    list.replaceChildren();
+    const total = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+    selectedFiles.slice(0, 6).forEach(file => {
+      const row = document.createElement('div'); row.className = 'file-row';
+      const icon = document.createElement('div'); icon.className = 'file-icon'; icon.textContent = file.type.startsWith('video/') ? '▶' : file.type.startsWith('image/') ? '▧' : '▤';
+      const meta = document.createElement('div'); meta.className = 'file-meta';
+      const name = document.createElement('div'); name.className = 'file-name'; name.textContent = file.name;
+      const size = document.createElement('div'); size.className = 'file-size'; size.textContent = formatBytes(file.size);
+      meta.append(name, size); row.append(icon, meta); list.append(row);
+    });
+    if (selectedFiles.length > 6) {
+      const more = document.createElement('div'); more.className = 'total'; more.textContent = '+ ' + (selectedFiles.length - 6) + ' more files'; list.append(more);
+    }
+    if (selectedFiles.length) {
+      const totalLine = document.createElement('div'); totalLine.className = 'total';
+      totalLine.textContent = selectedFiles.length + ' file(s) · ' + formatBytes(total) + ' total'; list.append(totalLine);
+    }
+    $('createLinkButton').disabled = selectedFiles.length === 0;
+    $('createLinkButton').textContent = selectedFiles.length ? 'Create share link →' : 'Choose files first';
+  }
+  function wsUrl(room, userRole) {
+    const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return scheme + '//' + location.host + '/signal/' + encodeURIComponent(room) + '?role=' + encodeURIComponent(userRole);
+  }
+  function sendSignalMessage(payload) {
+    if (!signalSocket || signalSocket.readyState !== WebSocket.OPEN) throw new Error('The connection link is no longer active. Reopen the page and try again.');
+    signalSocket.send(JSON.stringify({ type: 'signal', payload }));
+  }
+  function connectSignaling(userRole) {
+    return new Promise((resolve, reject) => {
+      const socket = new WebSocket(wsUrl(roomId, userRole));
+      signalSocket = socket;
+      let resolved = false;
+      const timeout = setTimeout(() => {
+        if (!resolved) { resolved = true; try { socket.close(); } catch {} reject(new Error('Could not connect to SYNAX Share. Refresh and try again.')); }
+      }, 15000);
+      socket.onopen = () => {
+        if (resolved) return;
+        resolved = true; clearTimeout(timeout); resolve();
+      };
+      socket.onmessage = event => {
+        let message;
+        try { message = JSON.parse(event.data); } catch { return; }
+        if (message.type === 'error') {
+          const detail = message.message || 'This share link is unavailable.';
+          setStatus(userRole === 'send' ? 'senderStatus' : 'receiverStatus', detail, 'bad');
+          return;
+        }
+        handleSignalingMessage(message).catch(error => {
+          console.error(error);
+          setStatus(userRole === 'send' ? 'senderStatus' : 'receiverStatus', error.message || String(error), 'bad');
+        });
+      };
+      socket.onerror = () => {
+        if (!resolved) { resolved = true; clearTimeout(timeout); reject(new Error('Could not connect. Check your internet connection and reopen the link.')); }
+      };
+      socket.onclose = event => {
+        clearTimeout(timeout);
+        if (!transferFinished && (userRole === 'send' || receiverAccepted)) {
+          const reason = event.reason ? ' (' + event.reason + ')' : '';
+          const id = userRole === 'send' ? 'senderStatus' : 'receiverStatus';
+          setStatus(id, 'The share connection closed' + reason + '. Keep both pages open and start a new link if needed.', 'warn');
+        }
+      };
+    });
+  }
+  function makePeerConnection() {
+    if (pc) return pc;
+    pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    pc.onicecandidate = event => {
+      if (event.candidate && signalSocket && signalSocket.readyState === WebSocket.OPEN) {
+        try { sendSignalMessage({ kind: 'candidate', candidate: event.candidate }); } catch (error) { console.warn(error); }
+      }
+    };
+    pc.onconnectionstatechange = () => {
+      if (!pc) return;
+      if (pc.connectionState === 'failed') {
+        const id = role === 'send' ? 'senderStatus' : 'receiverStatus';
+        setStatus(id, 'These two networks could not make a direct connection. Try Wi-Fi or mobile data on both devices, then create a fresh link.', 'bad');
+      }
+      if (pc.connectionState === 'connected' && role === 'send') setStatus('senderStatus', 'Connected! The files will send automatically now.', 'good');
+    };
+    if (role === 'receive') pc.ondatachannel = event => setupDataChannel(event.channel);
+    return pc;
+  }
+  async function startSenderOffer() {
+    if (role !== 'send' || senderOfferStarted || !selectedFiles.length) return;
+    senderOfferStarted = true;
+    try {
+      setStatus('senderStatus', 'The other person opened your link. Connecting…', 'warn');
+      const peer = makePeerConnection();
+      const dataChannel = peer.createDataChannel('synax-share-files', { ordered: true });
+      setupDataChannel(dataChannel);
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      sendSignalMessage({ kind: 'offer', description: peer.localDescription });
+    } catch (error) {
+      senderOfferStarted = false;
+      setStatus('senderStatus', 'Could not start transfer: ' + (error.message || String(error)), 'bad');
+    }
+  }
+  async function handleSignalingMessage(message) {
+    if (message.type === 'joined') {
+      if (role === 'send') {
+        setStatus('senderStatus', message.peerPresent ? 'Recipient found. Connecting…' : 'Waiting for the other person to open your link…', 'warn');
+        if (message.peerPresent) await startSenderOffer();
+      } else {
+        setStatus('receiverStatus', message.peerPresent ? 'Sender found. Making a secure direct connection…' : 'You are connected to the share room. Waiting for the sender to come online…', 'warn');
+      }
+      return;
+    }
+    if (message.type === 'peer-joined') {
+      if (role === 'send') await startSenderOffer();
+      else setStatus('receiverStatus', 'Sender found. Making a secure direct connection…', 'warn');
+      return;
+    }
+    if (message.type === 'peer-left') {
+      const id = role === 'send' ? 'senderStatus' : 'receiverStatus';
+      if (!transferFinished) setStatus(id, 'The other person disconnected. If the transfer is incomplete, ask them to reopen the link.', 'warn');
+      return;
+    }
+    if (message.type !== 'signal' || !message.payload) return;
+    const signal = message.payload;
+    if (signal.kind === 'offer' && role === 'receive') {
+      const peer = makePeerConnection();
+      await peer.setRemoteDescription(signal.description);
+      remoteDescriptionReady = true;
+      await applyPendingCandidates();
+      const answer = await peer.createAnswer();
+      await peer.setLocalDescription(answer);
+      sendSignalMessage({ kind: 'answer', description: peer.localDescription });
+      setStatus('receiverStatus', 'Connecting directly to the sender…', 'warn');
+    } else if (signal.kind === 'answer' && role === 'send') {
+      if (!pc) return;
+      await pc.setRemoteDescription(signal.description);
+      remoteDescriptionReady = true;
+      await applyPendingCandidates();
+    } else if (signal.kind === 'candidate') {
+      if (!pc || !pc.remoteDescription) pendingCandidates.push(signal.candidate);
+      else if (signal.candidate) await pc.addIceCandidate(signal.candidate);
+    }
+  }
+  async function applyPendingCandidates() {
+    if (!pc || !pc.remoteDescription) return;
+    const candidates = pendingCandidates.splice(0);
+    for (const candidate of candidates) {
+      if (candidate) await pc.addIceCandidate(candidate);
+    }
+  }
+  function setupDataChannel(dataChannel) {
+    channel = dataChannel;
+    channel.binaryType = 'arraybuffer';
+    channel.bufferedAmountLowThreshold = LOW_WATER;
+    channel.onopen = () => {
+      if (role === 'send') {
+        setStatus('senderStatus', 'Connected! Sending files automatically…', 'good');
+        if (!transferStarted) sendAllFiles();
+      } else {
+        setStatus('receiverStatus', 'Connected securely. Preparing to receive…', 'good');
+      }
+    };
+    channel.onclose = () => {
+      if (!transferFinished) setStatus(role === 'send' ? 'senderStatus' : 'receiverStatus', 'The transfer connection closed. If a file is incomplete, create a new link and retry.', 'warn');
+    };
+    channel.onerror = () => setStatus(role === 'send' ? 'senderStatus' : 'receiverStatus', 'The direct transfer encountered a connection error.', 'bad');
+    channel.onmessage = event => {
+      receiveQueue = receiveQueue.then(() => handleIncoming(event.data)).catch(error => {
+        console.error(error);
+        setStatus('receiverStatus', 'Could not receive the file: ' + (error.message || String(error)), 'bad');
+        try { if (activeReceive?.writable) activeReceive.writable.abort(); } catch {}
+        try { channel?.send(JSON.stringify({ type: 'error', id: activeReceive?.id, message: error.message || String(error) })); } catch {}
+      });
+    };
+  }
+  function sendControl(payload) {
+    if (!channel || channel.readyState !== 'open') throw new Error('The direct transfer connection closed.');
+    channel.send(JSON.stringify(payload));
+  }
+  function ackKey(type, id) { return type + ':' + id; }
+  function waitForAck(type, id, timeoutMs = 120000) {
+    return new Promise((resolve, reject) => {
+      const key = ackKey(type, id);
+      const timer = setTimeout(() => { pendingAcks.delete(key); reject(new Error('The other device stopped responding. Keep both pages open and retry.')); }, timeoutMs);
+      pendingAcks.set(key, { resolve: value => { clearTimeout(timer); resolve(value); }, reject: error => { clearTimeout(timer); reject(error); } });
+    });
+  }
+  function settleAck(type, id, value, failed = false) {
+    const key = ackKey(type, id); const entry = pendingAcks.get(key);
+    if (!entry) return;
+    pendingAcks.delete(key); failed ? entry.reject(new Error(value || 'The other device could not save the file.')) : entry.resolve(value);
+  }
+  async function createReceiveSink(meta) {
+    const size = Number(meta.size);
+    if (!Number.isFinite(size) || size < 0) throw new Error('The sender supplied an invalid file size.');
+    const clean = safeName(meta.name);
+    if (navigator.storage && typeof navigator.storage.getDirectory === 'function') {
+      try {
+        const estimate = await navigator.storage.estimate().catch(() => null);
+        if (estimate && Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage)) {
+          const free = Math.max(0, estimate.quota - estimate.usage);
+          if (size > free) throw new Error('There may not be enough free browser storage for ' + formatBytes(size) + '. Free device storage and try again.');
+        }
+        const root = await navigator.storage.getDirectory();
+        const directory = await root.getDirectoryHandle('synax-share-files', { create: true });
+        const diskName = Date.now() + '-' + safeName(meta.id) + '-' + clean;
+        const handle = await directory.getFileHandle(diskName, { create: true });
+        const writable = await handle.createWritable();
+        return { id: meta.id, name: clean, size, type: meta.mime || 'application/octet-stream', received: 0, writable, handle, diskName, chunks: [], mode: 'disk' };
+      } catch (error) {
+        if (error instanceof Error && (error.message.includes('not enough free') || error.message.includes('Free device storage'))) throw error;
+        console.warn('Device file storage unavailable; checking memory fallback.', error);
+      }
+    }
+    if (size > MEMORY_FALLBACK_MAX) {
+      throw new Error('This browser cannot stream large files to device storage. Open this link in an updated Chrome or Edge browser and try again.');
+    }
+    return { id: meta.id, name: clean, size, type: meta.mime || 'application/octet-stream', received: 0, writable: null, handle: null, diskName: '', chunks: [], mode: 'memory' };
+  }
+  async function handleIncoming(data) {
+    if (typeof data !== 'string') {
+      if (!activeReceive) throw new Error('Received file data before file details. Please create a new share link.');
+      const byteLength = data.byteLength || data.size || 0;
+      if (activeReceive.writable) await activeReceive.writable.write(data);
+      else activeReceive.chunks.push(data instanceof Blob ? data : new Blob([data]));
+      activeReceive.received += byteLength;
+      if (activeReceive.received > activeReceive.size) throw new Error('Received more data than expected. The transfer was stopped.');
+      updateProgress('receiver', 'Receiving ' + activeReceive.name + ' · ' + formatBytes(activeReceive.received) + ' of ' + formatBytes(activeReceive.size), activeReceive.received, activeReceive.size);
+      return;
+    }
+    let message;
+    try { message = JSON.parse(data); } catch { throw new Error('Received invalid transfer data.'); }
+    if (message.type === 'ready' || message.type === 'saved') { settleAck(message.type, message.id, message); return; }
+    if (message.type === 'error') { settleAck('ready', message.id, message.message, true); settleAck('saved', message.id, message.message, true); setStatus('senderStatus', 'Receive failed: ' + (message.message || 'Unknown error.'), 'bad'); return; }
+    if (message.type === 'file-meta') {
+      if (activeReceive) throw new Error('A new file started before the previous file finished.');
+      try {
+        activeReceive = await createReceiveSink(message);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        sendControl({ type: 'error', id: message.id, message: reason });
+        setStatus('receiverStatus', 'Cannot receive this file: ' + reason, 'bad');
+        return;
+      }
+      setStatus('receiverStatus', 'Receiving ' + activeReceive.name + '… Keep this page open.', 'good');
+      updateProgress('receiver', 'Preparing ' + activeReceive.name, 0, activeReceive.size);
+      sendControl({ type: 'ready', id: activeReceive.id });
+      return;
+    }
+    if (message.type === 'file-end') {
+      if (!activeReceive || activeReceive.id !== message.id) throw new Error('File completion did not match the active transfer.');
+      const current = activeReceive;
+      if (current.received !== current.size) throw new Error('File ended early (' + formatBytes(current.received) + ' of ' + formatBytes(current.size) + ').');
+      if (current.writable) await current.writable.close();
+      let file;
+      if (current.mode === 'disk') file = await current.handle.getFile();
+      else file = new File(current.chunks, current.name, { type: current.type, lastModified: Date.now() });
+      const url = URL.createObjectURL(file); downloadUrls.add(url);
+      receiveHandles.set(current.id, current);
+      addDownloadCard(current, url);
+      activeReceive = null;
+      setStatus('receiverStatus', 'Received ' + current.name + ' successfully. Tap Download to save it to your device.', 'good');
+      updateProgress('receiver', 'Received ' + current.name, current.size, current.size);
+      sendControl({ type: 'saved', id: current.id });
+      return;
+    }
+    if (message.type === 'transfer-complete') {
+      transferFinished = true;
+      setStatus(role === 'send' ? 'senderStatus' : 'receiverStatus', 'All files transferred successfully!', 'good');
+      if (role === 'send') updateProgress('sender', 'Transfer complete', selectedFiles.reduce((sum, f) => sum + f.size, 0), selectedFiles.reduce((sum, f) => sum + f.size, 0));
+      return;
+    }
+  }
+  function addDownloadCard(meta, url) {
+    const card = document.createElement('div'); card.className = 'download-card';
+    const name = document.createElement('div'); name.className = 'file-name'; name.textContent = '✅ ' + meta.name + ' · ' + formatBytes(meta.size);
+    const actions = document.createElement('div'); actions.className = 'download-actions';
+    const link = document.createElement('a'); link.className = 'btn primary'; link.href = url; link.download = meta.name; link.textContent = 'Download file';
+    const del = document.createElement('button'); del.className = 'delete-copy'; del.textContent = 'Delete copy';
+    del.addEventListener('click', async () => {
+      try { if (meta.handle && meta.diskName) await meta.handle.remove(); } catch (error) { console.warn(error); }
+      try { URL.revokeObjectURL(url); } catch {} downloadUrls.delete(url); card.remove();
+    });
+    actions.append(link, del); card.append(name, actions); $('receivedFiles').prepend(card);
+  }
+  async function waitForBuffer() {
+    if (!channel || channel.readyState !== 'open') throw new Error('The connection closed while sending.');
+    if (channel.bufferedAmount <= HIGH_WATER) return;
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { clean(); reject(new Error('The network stopped accepting data. Keep both devices online and retry.')); }, 60000);
+      const low = () => { clean(); resolve(); };
+      const closed = () => { clean(); reject(new Error('The connection closed during transfer.')); };
+      function clean() { clearTimeout(timer); channel?.removeEventListener('bufferedamountlow', low); channel?.removeEventListener('close', closed); }
+      channel.addEventListener('bufferedamountlow', low, { once: true });
+      channel.addEventListener('close', closed, { once: true });
+      if (channel.bufferedAmount <= LOW_WATER) low();
+    });
+  }
+  async function sendOneFile(file, allBytes, baseSent) {
+    const id = crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2);
+    const readyPromise = waitForAck('ready', id, 120000);
+    sendControl({ type: 'file-meta', id, name: file.name, size: file.size, mime: file.type || 'application/octet-stream' });
+    await readyPromise;
+    let offset = 0, lastUi = 0;
+    while (offset < file.size) {
+      await waitForBuffer();
+      if (!channel || channel.readyState !== 'open') throw new Error('The connection closed while sending.');
+      const buffer = await file.slice(offset, Math.min(offset + CHUNK_SIZE, file.size)).arrayBuffer();
+      channel.send(buffer); offset += buffer.byteLength;
+      if (offset - lastUi >= CHUNK_SIZE * 4 || offset >= file.size) {
+        updateProgress('sender', 'Sending ' + file.name + ' · ' + formatBytes(offset) + ' of ' + formatBytes(file.size), baseSent + offset, allBytes);
+        lastUi = offset;
+      }
+    }
+    const savedPromise = waitForAck('saved', id, Math.max(5 * 60 * 1000, Math.ceil(file.size / (1024 * 128)) * 1000));
+    sendControl({ type: 'file-end', id });
+    await savedPromise;
+    const card = document.createElement('div'); card.className = 'status good'; card.textContent = '✓ Sent: ' + file.name + ' · ' + formatBytes(file.size); $('sentFiles').append(card);
+    return file.size;
+  }
+  async function sendAllFiles() {
+    if (transferStarted || role !== 'send' || !channel || channel.readyState !== 'open') return;
+    transferStarted = true;
+    const total = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+    let sent = 0;
+    $('senderProgress').style.display = 'block';
+    try {
+      for (const file of selectedFiles) {
+        setStatus('senderStatus', 'Sending ' + file.name + '. Please keep this page open.', 'warn');
+        sent += await sendOneFile(file, total, sent);
+      }
+      sendControl({ type: 'transfer-complete' });
+      transferFinished = true;
+      updateProgress('sender', 'All files sent', total, total);
+      setStatus('senderStatus', 'Done! The other person has received the files. They can tap Download now.', 'good');
+    } catch (error) {
+      console.error(error);
+      setStatus('senderStatus', 'Transfer stopped: ' + (error.message || String(error)) + ' — keep both pages open and start a fresh link if needed.', 'bad');
+    }
+  }
+  async function copyShareLink() {
+    const value = $('shareLink').value;
+    try { await navigator.clipboard.writeText(value); $('copyLinkButton').textContent = 'Copied ✓'; setStatus('senderStatus', 'Link copied. Send it to the person who should receive your files.', 'good'); }
+    catch { $('shareLink').focus(); $('shareLink').select(); setStatus('senderStatus', 'The link is selected. Tap Copy on your keyboard or use Share link.', 'warn'); }
+  }
+  async function shareLink() {
+    try {
+      if (navigator.share) await navigator.share({ title: 'SYNAX Share', text: 'Tap this link to receive my files:', url: shareUrl });
+      else await copyShareLink();
+    } catch (error) {
+      if (error && error.name !== 'AbortError') await copyShareLink();
+    }
+  }
+  async function createShare() {
+    if (!selectedFiles.length) return;
+    $('createLinkButton').disabled = true;
+    $('createLinkButton').textContent = 'Creating link…';
+    try {
+      roomId = randomRoomId();
+      shareUrl = location.origin + location.pathname + '?room=' + encodeURIComponent(roomId);
+      showOnly('sendWaiting');
+      $('shareLink').value = shareUrl;
+      $('senderProgress').style.display = 'none';
+      await connectSignaling('send');
+      setStatus('senderStatus', 'Your link is ready. Share it using WhatsApp or Copy. Waiting for the recipient…', 'good');
+    } catch (error) {
+      showOnly('sendHome');
+      setStatus('homeStatus', error.message || String(error), 'bad');
+      $('createLinkButton').disabled = false;
+      $('createLinkButton').textContent = 'Create share link →';
+    }
+  }
+  async function acceptReceive() {
+    if (receiverAccepted) return;
+    receiverAccepted = true;
+    $('acceptButton').disabled = true;
+    $('acceptButton').textContent = 'Connecting…';
+    setStatus('receiverStatus', 'Connecting to the sender. Keep this page open…', 'warn');
+    try { await connectSignaling('receive'); }
+    catch (error) {
+      receiverAccepted = false; $('acceptButton').disabled = false; $('acceptButton').textContent = 'Try again';
+      setStatus('receiverStatus', error.message || String(error), 'bad');
+    }
+  }
+  function resetSender() {
+    try { signalSocket?.close(); } catch {}
+    try { channel?.close(); pc?.close(); } catch {}
+    signalSocket = null; channel = null; pc = null; roomId = ''; shareUrl = ''; senderOfferStarted = false; transferStarted = false; transferFinished = false; remoteDescriptionReady = false; pendingCandidates = [];
+    for (const entry of pendingAcks.values()) entry.reject(new Error('Transfer cancelled.')); pendingAcks.clear();
+    selectedFiles = []; $('fileInput').value = ''; $('pickedFiles').replaceChildren(); $('sentFiles').replaceChildren(); $('shareLink').value = '';
+    $('senderProgress').style.display = 'none'; $('createLinkButton').disabled = true; $('createLinkButton').textContent = 'Choose files first';
+    showOnly('sendHome'); $('homeStatus').classList.add('hidden');
+  }
+  $('fileInput').addEventListener('change', renderSelectedFiles);
+  $('createLinkButton').addEventListener('click', createShare);
+  $('copyLinkButton').addEventListener('click', copyShareLink);
+  $('nativeShareButton').addEventListener('click', shareLink);
+  $('cancelButton').addEventListener('click', resetSender);
+  $('acceptButton').addEventListener('click', acceptReceive);
+
+  const params = new URLSearchParams(location.search);
+  const incomingRoom = params.get('room');
+  if (incomingRoom) {
+    if (!/^[A-Za-z0-9_-]{20,64}$/.test(incomingRoom)) {
+      showOnly('receiveHome'); $('acceptButton').disabled = true;
+      setStatus('receiverStatus', 'This share link is not valid. Ask the sender to create a new link.', 'bad');
+    } else {
+      role = 'receive'; roomId = incomingRoom; showOnly('receiveHome');
+    }
+  } else {
+    role = 'send'; showOnly('sendHome');
+  }
+  if (!window.isSecureContext) {
+    const id = role === 'send' ? 'homeStatus' : 'receiverStatus';
+    setStatus(id, 'This page needs HTTPS to connect devices securely. Open the HTTPS share link.', 'bad');
+  }
+  window.addEventListener('beforeunload', () => {
+    try { signalSocket?.close(); channel?.close(); pc?.close(); } catch {}
+    downloadUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch {} });
+  });
+})();
+</script>
+</body>
+</html>

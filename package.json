@@ -1,0 +1,14 @@
+{
+  "name": "synax-share-easy",
+  "version": "2.0.0",
+  "private": true,
+  "description": "One-link peer-to-peer file sharing with Cloudflare Worker signaling and no media storage",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261013.1",
+    "wrangler": "^4.149.0"
+  }
+}
